@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import type { Feature, LineString } from 'geojson';
 import { getCollection, type CollectionEntry } from 'astro:content';
-import { parseGpx, type GpxData, type HikeStats } from './gpx';
+import { GpxError, parseGpx, type GpxData, type HikeStats } from './gpx';
 
 export type HikeEntry = CollectionEntry<'hikes'>;
 
@@ -45,4 +46,72 @@ export async function getVisibleHikes(): Promise<HikeEntry[]> {
   return (await getCollection('hikes'))
     .filter((h) => import.meta.env.DEV || h.data.status !== 'draft')
     .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+}
+
+export interface IndexMapHike {
+  slug: string;
+  title: string;
+  date: string;
+  distance_km: number | null;
+  cover: string | null;
+}
+
+export interface IndexMapData {
+  lines: Feature<LineString>[];
+  starts: ([number, number] | null)[];
+  hikes: IndexMapHike[];
+  bounds: [[number, number], [number, number]] | null;
+}
+
+/**
+ * Build the single-source payload for the lifetime index map (SPEC §3/§7):
+ * every visible hike's track line + start pin, index-aligned, with combined
+ * bounds. Hikes whose GPX can't be parsed are skipped on the map (still listed
+ * in the logbook); other errors propagate so the build fails loudly.
+ */
+export async function getIndexMapData(): Promise<IndexMapData> {
+  const hikes = await getVisibleHikes();
+  const dateFmt = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
+
+  const lines: Feature<LineString>[] = [];
+  const starts: ([number, number] | null)[] = [];
+  const meta: IndexMapHike[] = [];
+  let minLon = Infinity;
+  let minLat = Infinity;
+  let maxLon = -Infinity;
+  let maxLat = -Infinity;
+
+  for (const hike of hikes) {
+    let gpx: GpxData;
+    try {
+      gpx = loadGpx(hike);
+    } catch (err) {
+      if (err instanceof GpxError) continue; // unusable track → omit from map
+      throw err;
+    }
+    lines.push(gpx.line);
+    starts.push(hike.data.hidePrecisePins ? null : gpx.start);
+    meta.push({
+      slug: hike.id,
+      title: hike.data.title,
+      date: dateFmt.format(hike.data.date),
+      distance_km: hike.data.distance_km ?? gpx.stats.distance_km,
+      cover: hike.data.cover ?? null,
+    });
+    const [[bMinLon, bMinLat], [bMaxLon, bMaxLat]] = gpx.bounds;
+    minLon = Math.min(minLon, bMinLon);
+    minLat = Math.min(minLat, bMinLat);
+    maxLon = Math.max(maxLon, bMaxLon);
+    maxLat = Math.max(maxLat, bMaxLat);
+  }
+
+  const bounds: IndexMapData['bounds'] =
+    lines.length > 0
+      ? [
+          [minLon, minLat],
+          [maxLon, maxLat],
+        ]
+      : null;
+
+  return { lines, starts, hikes: meta, bounds };
 }

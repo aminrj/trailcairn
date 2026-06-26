@@ -1,0 +1,78 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "trailcairn" [ref=e4] [cursor=pointer]:
+        - /url: /
+      - navigation [ref=e5]:
+        - link "Hikes" [ref=e6] [cursor=pointer]:
+          - /url: /
+        - link "About" [ref=e7] [cursor=pointer]:
+          - /url: /about
+  - main [ref=e8]:
+    - article [ref=e9]:
+      - generic [ref=e10]:
+        - heading "Example ridge loop" [level=1] [ref=e11]
+        - paragraph [ref=e12]: A bundled placeholder hike so the site works on a fresh clone before you add real data.
+      - generic [ref=e13]:
+        - region "Map" [ref=e14]
+        - generic [ref=e15]:
+          - button "Zoom in" [ref=e16] [cursor=pointer]
+          - button "Zoom out" [ref=e18] [cursor=pointer]
+      - generic [ref=e20]:
+        - generic [ref=e21]:
+          - generic [ref=e22]: Date
+          - text: June 14, 2026
+        - generic [ref=e23]:
+          - generic [ref=e24]: Location
+          - text: Nowhere in particular (synthetic example)
+        - generic [ref=e25]:
+          - generic [ref=e26]: Distance
+          - text: 2.2 km
+        - generic [ref=e27]:
+          - generic [ref=e28]: Ascent
+          - text: 82 m
+        - generic [ref=e29]:
+          - generic [ref=e30]: Descent
+          - text: 98 m
+        - generic [ref=e31]:
+          - generic [ref=e32]: Duration
+          - text: 3h 24m
+      - figure "844–942 m · 2.2 km" [ref=e33]:
+        - 'img "Elevation profile: 844–942 m over 2.2 km" [ref=e34]'
+        - generic [ref=e37]: 844–942 m · 2.2 km
+      - generic [ref=e38]:
+        - paragraph [ref=e39]:
+          - text: This is the
+          - strong [ref=e40]: bundled example hike
+          - text: . It exists so that
+          - code [ref=e41]: npm install && npm run dev
+          - text: shows a working site immediately, before any of your real hikes are added.
+        - paragraph [ref=e42]:
+          - text: Because its
+          - code [ref=e43]: status
+          - text: is
+          - code [ref=e44]: draft
+          - text: ", it renders while you develop locally but is left out of production builds — so it will never deploy."
+        - paragraph [ref=e45]:
+          - text: To add your own first hike, copy
+          - code [ref=e46]: src/content/hikes/_TEMPLATE/
+          - text: to a new folder (the folder name becomes the URL slug), drop in your
+          - code [ref=e47]: track.gpx
+          - text: and
+          - code [ref=e48]: photos/
+          - text: ", edit the frontmatter, and save. The dev server hot-reloads it in."
+  - contentinfo [ref=e49]:
+    - generic [ref=e50]: trailcairn — A personal, public ledger of hikes — each with a GPX track on a map, photos placed along it, derived stats, and a diary entry.
+  - generic [ref=e53]:
+    - button "Menu" [ref=e54]:
+      - img [ref=e56]
+      - generic: Menu
+    - button "Inspect" [ref=e60]:
+      - img [ref=e62]
+      - generic: Inspect
+    - button "Audit" [ref=e64]:
+      - img [ref=e66]
+      - generic: Audit
+    - button "Settings" [ref=e69]:
+      - img [ref=e71]
+      - generic: Settings

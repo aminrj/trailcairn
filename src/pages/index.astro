@@ -1,12 +1,11 @@
 ---
-import { getCollection } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { SITE_NAME, SITE_TAGLINE } from '../consts';
+import Map from '../components/Map.astro';
+import { SITE_TAGLINE } from '../consts';
+import { getVisibleHikes, getIndexMapData } from '../lib/hikes';
 
-// Draft hikes render in dev but are excluded from production builds (SPEC §2.1).
-const hikes = (await getCollection('hikes'))
-  .filter((h) => import.meta.env.DEV || h.data.status !== 'draft')
-  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+const hikes = await getVisibleHikes();
+const mapData = await getIndexMapData();
 
 const dateFmt = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
 ---
@@ -15,10 +14,23 @@ const dateFmt = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
   <section class="hike-header">
     <h1>{SITE_TAGLINE}</h1>
     <p class="prose">
-      A public ledger of hikes. The lifetime map and summary stats land in the next slice —
-      for now this is the logbook.
+      A public ledger of hikes. Every track below sits on the lifetime map; the summary stats band
+      and search arrive in a later slice.
     </p>
   </section>
+
+  {
+    mapData.bounds && (
+      <Map
+        id="index-map"
+        lines={mapData.lines}
+        starts={mapData.starts}
+        bounds={mapData.bounds}
+        hikes={mapData.hikes}
+        height="62vh"
+      />
+    )
+  }
 
   {
     hikes.length === 0 ? (

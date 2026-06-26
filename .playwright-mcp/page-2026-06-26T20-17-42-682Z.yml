@@ -1,0 +1,29 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "trailcairn" [ref=e4] [cursor=pointer]:
+        - /url: /
+      - navigation [ref=e5]:
+        - link "Hikes" [ref=e6] [cursor=pointer]:
+          - /url: /
+        - link "About" [ref=e7] [cursor=pointer]:
+          - /url: /about
+  - main [ref=e8]:
+    - generic [ref=e9]:
+      - heading "A lifetime hiking diary" [level=1] [ref=e10]
+      - paragraph [ref=e11]: A public ledger of hikes. Every track below sits on the lifetime map; the summary stats band and search arrive in a later slice.
+    - generic [ref=e12]:
+      - region "Map" [ref=e13]
+      - generic [ref=e14]:
+        - button "Zoom in" [ref=e15] [cursor=pointer]
+        - button "Zoom out" [ref=e17] [cursor=pointer]
+    - list [ref=e19]:
+      - listitem [ref=e20]:
+        - heading "Example ridge loop draft" [level=2] [ref=e21]:
+          - link "Example ridge loop" [ref=e22] [cursor=pointer]:
+            - /url: /hikes/_example
+          - text: draft
+        - paragraph [ref=e23]: Jun 14, 2026 · Nowhere in particular (synthetic example)
+        - paragraph [ref=e24]: A bundled placeholder hike so the site works on a fresh clone before you add real data.
+  - contentinfo [ref=e25]:
+    - generic [ref=e26]: trailcairn — A personal, public ledger of hikes — each with a GPX track on a map, photos placed along it, derived stats, and a diary entry.

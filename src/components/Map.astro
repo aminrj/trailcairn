@@ -24,8 +24,8 @@ interface Props {
   id: string;
   /** One or more track lines to draw. */
   lines: Feature<LineString>[];
-  /** Start pins, [lon, lat]. */
-  starts?: [number, number][];
+  /** Start pins, [lon, lat], index-aligned with `lines`. null omits a pin (privacy). */
+  starts?: ([number, number] | null)[];
   /** Bounds [[minLon,minLat],[maxLon,maxLat]] to fit on load. */
   bounds: [[number, number], [number, number]];
   /** Optional per-hike metadata for index popups, keyed by line index. */
@@ -96,7 +96,7 @@ const config = { styleUrl: MAP_STYLE_URL, lines, starts, bounds, hikes, photos, 
   type Cfg = {
     styleUrl: string;
     lines: GeoJSON.Feature<GeoJSON.LineString>[];
-    starts: [number, number][];
+    starts: ([number, number] | null)[];
     bounds: [[number, number], [number, number]];
     hikes: ({ slug: string; title: string; date: string; distance_km: number | null } | null)[];
     photos: { lng: number; lat: number; thumb: string; full: string; caption?: string; index: number }[];
@@ -136,17 +136,17 @@ const config = { styleUrl: MAP_STYLE_URL, lines, starts, bounds, hikes, photos, 
         paint: { 'line-color': '#c0392b', 'line-width': 3.5, 'line-opacity': 0.9 },
       });
 
-      if (cfg.starts.length) {
+      const startFeatures = cfg.starts
+        .map((s, i) =>
+          s
+            ? { type: 'Feature' as const, properties: { idx: i }, geometry: { type: 'Point' as const, coordinates: s } }
+            : null,
+        )
+        .filter((f): f is NonNullable<typeof f> => f !== null);
+      if (startFeatures.length) {
         map.addSource('starts', {
           type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: cfg.starts.map((s, i) => ({
-              type: 'Feature',
-              properties: { idx: i },
-              geometry: { type: 'Point', coordinates: s },
-            })),
-          },
+          data: { type: 'FeatureCollection', features: startFeatures },
         });
         map.addLayer({
           id: 'starts-circle',
