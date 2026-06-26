@@ -40,10 +40,20 @@ and immediately see look, feel, rendering, and performance. Deployment to a free
 - **GPX parsing:** a small, well-maintained GPX→GeoJSON library at build time (e.g.
   `@tmcw/togeojson` with `xmldom`, or equivalent). Parse at build time, never ship raw GPX to
   the client for rendering.
-- **Image processing:** Astro's built-in image pipeline (`astro:assets` / Sharp) for responsive
-  derivatives. Do not hand-roll resizing.
-- **EXIF reading:** a maintained EXIF library (e.g. `exifr`) at build time to extract photo
-  timestamp and GPS.
+- **Image processing:** Sharp for responsive derivatives, driven by a thin build-time helper
+  (`lib/photos.ts`) rather than the `<Image>` component. This deviation from a pure `astro:assets`
+  flow is deliberate and necessary: (a) source photos include **HEIC**, which Sharp's prebuilt
+  binaries can't decode, so HEIC is converted to JPEG first via `heic-convert` (pure JS, no native
+  deps) and then resized by Sharp; (b) we need GPS EXIF stripped from derivatives (Sharp drops
+  source metadata by default); (c) the per-hike map island needs the derivative URLs as data. Sharp
+  is still the engine — we don't hand-roll pixel resizing. All derivative URLs go through one helper
+  (the object-storage seam, §10).
+- **Photo formats:** ingest both **JPEG** and **HEIC** (the two formats the owner's exports
+  produce), plus PNG/WebP. HEIC is decoded as above; everything is emitted as WebP derivatives.
+- **EXIF reading:** a maintained EXIF library (`exifr`) at build time to extract photo timestamp
+  and GPS. Note: exports from Google Photos frequently **strip EXIF** (commonly the HEIC copies),
+  leaving no GPS or timestamp; such photos are simply left unplaced (§6) and can be pinned via
+  `_photos.json`.
 - **Styling:** plain CSS (or a single lightweight utility layer if preferred). Editorial,
   minimalist. Owner's font preference: a serif display face (Fraunces) for headings + a mono
   (JetBrains Mono) for stats/metadata. Load via self-hosted font files or a font CDN; expose
@@ -196,10 +206,12 @@ Manual overrides win over both EXIF and timestamp inference. Example:
 }
 ```
 
-**Timezone caution:** EXIF timestamps are often local-without-zone and GPX is UTC. Implement a
-single configurable offset (or detect from GPX) and document it; a wrong offset shifts every
-photo along the track. Surface this in `npm run validate` output (e.g. "photo time vs track time
-delta looks large — check timezone").
+**Timezone caution:** EXIF timestamps are often local-without-zone and GPX is UTC. Modern phone
+photos usually include an explicit `OffsetTimeOriginal` — when present, it is used directly. When
+absent, a single configurable fallback offset (`PHOTO_UTC_OFFSET_HOURS` env, default 0) is applied;
+a wrong value shifts every timestamp-placed photo along the track. `npm run validate` surfaces large
+photo-time-vs-track-time deltas. (Timestamp matches with a gap beyond a sane threshold are left
+unplaced rather than dropped on the wrong spot.)
 
 **Privacy:** if `hidePrecisePins: true`, do not render the exact start pin / first trackpoint
 (fuzz it or trim the track ends). Also: **strip GPS EXIF from the public derivative images** by

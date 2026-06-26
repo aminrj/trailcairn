@@ -1,4 +1,5 @@
 {
-  "example-1.jpg": { "caption": "Looking up the ridge (placeholder image)" },
-  "example-2.jpg": { "caption": "Near the high point (placeholder image)" }
+  "_comment": "The bundled placeholder photos have no EXIF, so they're pinned manually here (lat/lng) to demonstrate photo-on-map placement. Your real phone photos usually place themselves by GPS or timestamp; use this file only to fix or caption ones that land wrong.",
+  "example-1.jpg": { "lat": 61.5712, "lng": 12.7035, "caption": "Looking up the ridge (placeholder image)" },
+  "example-2.jpg": { "lat": 61.5755, "lng": 12.7139, "caption": "Near the high point (placeholder image)" }
 }

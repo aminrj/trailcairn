@@ -2,10 +2,13 @@
 import { render } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Map from '../../components/Map.astro';
+import type { MapPhoto } from '../../components/Map.astro';
 import StatsBand from '../../components/StatsBand.astro';
 import ElevationProfile from '../../components/ElevationProfile.astro';
+import Gallery from '../../components/Gallery.astro';
 import { getVisibleHikes, loadGpx, resolveStats } from '../../lib/hikes';
 import { GpxError } from '../../lib/gpx';
+import { processHikePhotos } from '../../lib/photos';
 
 export async function getStaticPaths() {
   const hikes = await getVisibleHikes();
@@ -34,6 +37,20 @@ const stats = gpx
       descent_m: hike.data.descent_m ?? null,
       duration: hike.data.duration ?? null,
     };
+
+// Photos: EXIF/timestamp placement + derivatives (slice 4).
+const { photos } = await processHikePhotos(hike, gpx);
+const mapPhotos: MapPhoto[] = photos
+  .map((p, index) => ({ p, index }))
+  .filter(({ p }) => p.placed)
+  .map(({ p, index }) => ({
+    lng: p.lng!,
+    lat: p.lat!,
+    thumb: p.derivatives.thumb,
+    full: p.derivatives.full,
+    caption: p.caption ?? undefined,
+    index,
+  }));
 ---
 
 <BaseLayout title={hike.data.title} description={hike.data.summary}>
@@ -48,8 +65,9 @@ const stats = gpx
         <Map
           id={`map-${hike.id}`}
           lines={[gpx.line]}
-          starts={hike.data.hidePrecisePins ? [] : [gpx.start]}
+          starts={hike.data.hidePrecisePins ? [null] : [gpx.start]}
           bounds={gpx.bounds}
+          photos={mapPhotos}
           reveal={true}
           height="55vh"
         />
@@ -72,6 +90,16 @@ const stats = gpx
     <div class="prose hike-body">
       <Content />
     </div>
+
+    <Gallery photos={photos} />
+    {
+      photos.some((p) => !p.placed) && (
+        <p class="meta unplaced-note">
+          Photos without a dot aren't on the map (no GPS or matching timestamp). Pin them via{' '}
+          <code>photos/_photos.json</code>.
+        </p>
+      )
+    }
   </article>
 </BaseLayout>
 

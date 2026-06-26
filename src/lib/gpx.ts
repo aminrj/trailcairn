@@ -23,6 +23,10 @@ export interface HikeStats {
 export interface GpxData {
   /** Single merged LineString feature, [lon, lat] pairs — ready to drop into a GeoJSON source. */
   line: Feature<LineString>;
+  /** [lon, lat] pairs for every trackpoint (for photo timestamp matching). */
+  coordinates: [number, number][];
+  /** Epoch ms per trackpoint, aligned to `coordinates`; null where no timestamp. */
+  times: (number | null)[];
   /** [lon, lat] of the first trackpoint (the start pin). */
   start: [number, number];
   /** [[minLon, minLat], [maxLon, maxLat]] bounds. */
@@ -181,8 +185,12 @@ export function parseGpx(xml: string): GpxData {
     geometry: { type: 'LineString', coordinates: coords2d },
   };
 
+  const timesMs = times.map((t) => (t ? new Date(t).getTime() : null));
+
   return {
     line,
+    coordinates: coords2d,
+    times: timesMs,
     start: coords2d[0],
     bounds: [
       [minLon, minLat],

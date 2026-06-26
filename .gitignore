@@ -2,6 +2,9 @@
 node_modules/
 dist/
 .astro/
+
+# Generated responsive image derivatives (rebuilt from originals on build)
+public/_gen/
 .env
 .env.*
 !.env.example
@@ -19,3 +22,6 @@ src/content/hikes/*/
 # OS noise
 .DS_Store
 Thumbs.db
+
+# Tooling artifacts
+.playwright-mcp/
