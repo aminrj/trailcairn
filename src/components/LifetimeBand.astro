@@ -1,0 +1,65 @@
+---
+import type { LifetimeStats } from '../lib/stats';
+
+interface Props {
+  stats: LifetimeStats;
+}
+const { stats } = Astro.props;
+const fmt = new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric' });
+
+const range =
+  stats.firstDate && stats.lastDate
+    ? stats.firstDate.getTime() === stats.lastDate.getTime()
+      ? fmt.format(stats.firstDate)
+      : `${fmt.format(stats.firstDate)} – ${fmt.format(stats.lastDate)}`
+    : '—';
+
+const cells: { label: string; value: string }[] = [
+  { label: 'Hikes', value: String(stats.hikeCount) },
+  { label: 'Days out', value: String(stats.distinctDays) },
+  { label: 'Distance', value: `${stats.totalDistanceKm} km` },
+  { label: 'Ascent', value: `${stats.totalAscentM} m` },
+  { label: 'Span', value: range },
+];
+---
+
+{
+  stats.hikeCount > 0 && (
+    <dl class="lifetime-band">
+      {cells.map((c) => (
+        <div>
+          <dt>{c.label}</dt>
+          <dd>{c.value}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+<style>
+  .lifetime-band {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 2.5rem;
+    margin: 1.5rem 0;
+    padding: 1.1rem 0;
+    border-top: 1px solid var(--line, #e4e0d8);
+    border-bottom: 1px solid var(--line, #e4e0d8);
+  }
+  .lifetime-band div {
+    margin: 0;
+  }
+  .lifetime-band dt {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft, #5b5b54);
+  }
+  .lifetime-band dd {
+    margin: 0.1rem 0 0;
+    font-family: var(--font-mono, monospace);
+    font-size: 1.35rem;
+    color: var(--ink, #1a1a17);
+  }
+</style>

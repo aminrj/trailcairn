@@ -1,0 +1,44 @@
+---
+// Pagefind search box (SPEC §3.1). Pagefind builds its index as a postbuild
+// step against dist/, so the /pagefind/ assets only exist in production builds.
+// In `npm run dev` they 404 and the box hides itself — search is verified via
+// `npm run build && npm run preview`.
+---
+
+<div class="search">
+  <div id="pagefind-search" data-search></div>
+  <p class="search-hint meta" data-search-hint hidden>
+    Search is generated at build time — run <code>npm run build</code> then <code>npm run preview</code>.
+  </p>
+</div>
+
+<link rel="stylesheet" href="/pagefind/pagefind-ui.css" />
+<script
+  is:inline
+  src="/pagefind/pagefind-ui.js"
+  onerror="document.querySelector('[data-search]')?.setAttribute('hidden','');document.querySelector('[data-search-hint]')?.removeAttribute('hidden')"
+></script>
+<script is:inline>
+  window.addEventListener('load', () => {
+    if (window.PagefindUI) {
+      new window.PagefindUI({
+        element: '#pagefind-search',
+        showSubResults: true,
+        showImages: false,
+        resetStyles: false,
+      });
+    }
+  });
+</script>
+
+<style>
+  .search {
+    margin: 1.5rem 0 0;
+  }
+  .search-hint {
+    margin: 0.5rem 0 0;
+  }
+  :global(.pagefind-ui__search-input) {
+    font-family: var(--font-body, sans-serif);
+  }
+</style>

@@ -4,7 +4,9 @@ import exifr from 'exifr';
 import sharp from 'sharp';
 import heicConvert from 'heic-convert';
 import type { GpxData } from './gpx';
-import { hikeDir, type HikeEntry } from './hikes';
+
+// NOTE: this module deliberately has no `astro:content` dependency so the
+// standalone validate script (plain Node via tsx) can reuse its EXIF logic.
 
 // --- config -----------------------------------------------------------------
 
@@ -74,7 +76,34 @@ export interface HikePhotos {
   cover: ProcessedPhoto | null;
 }
 
+/** Minimal input so this module needn't know about astro:content entries. */
+export interface HikePhotoInput {
+  /** URL slug (also the derivative subfolder). */
+  slug: string;
+  /** Absolute path to the hike folder (containing photos/). */
+  dir: string;
+  /** Frontmatter `cover` value (path or filename), if any. */
+  cover?: string | null;
+}
+
+export interface PhotoExif {
+  hasGps: boolean;
+  lat: number | null;
+  lng: number | null;
+  hasTime: boolean;
+  epochMs: number | null;
+  offsetSource: 'exif' | 'fallback' | 'none';
+}
+
 // --- helpers ----------------------------------------------------------------
+
+export function isPhotoFile(name: string): boolean {
+  return (
+    !name.startsWith('.') &&
+    !name.startsWith('_') &&
+    PHOTO_EXTS.has(path.extname(name).toLowerCase())
+  );
+}
 
 function readOverrides(photosDir: string): Record<string, PhotoOverride> {
   const file = path.join(photosDir, '_photos.json');
@@ -179,6 +208,48 @@ async function ensureDerivative(
   return genUrl(slug, file);
 }
 
+/**
+ * Read placement-relevant EXIF from a photo's original bytes (HEIC + JPEG).
+ * Never throws — returns "nothing found" on any read error. Used by both the
+ * build pipeline and the validate script.
+ */
+export async function inspectPhotoExif(absPath: string): Promise<PhotoExif> {
+  let gps: { latitude?: number; longitude?: number } | undefined;
+  let timeData: Record<string, unknown> | undefined;
+  try {
+    gps = await exifr.gps(fs.readFileSync(absPath));
+  } catch {
+    gps = undefined;
+  }
+  try {
+    timeData = await exifr.parse(fs.readFileSync(absPath), {
+      reviveValues: false,
+      pick: ['DateTimeOriginal', 'OffsetTimeOriginal', 'CreateDate', 'OffsetTime'],
+    });
+  } catch {
+    timeData = undefined;
+  }
+  const hasGps = gps?.latitude != null && gps?.longitude != null;
+  const dtRaw = (timeData?.DateTimeOriginal ?? timeData?.CreateDate) as string | undefined;
+  const offRaw = (timeData?.OffsetTimeOriginal ?? timeData?.OffsetTime) as string | undefined;
+  const epoch = dtRaw ? exifToEpochMs(dtRaw, offRaw) : null;
+  return {
+    hasGps,
+    lat: hasGps ? gps!.latitude! : null,
+    lng: hasGps ? gps!.longitude! : null,
+    hasTime: !!epoch,
+    epochMs: epoch ? epoch.ms : null,
+    offsetSource: epoch ? epoch.offsetSource : 'none',
+  };
+}
+
+/** Nearest-trackpoint match exposed for validate's timezone-skew check. */
+export function matchPhotoToTrack(epochMs: number, gpx: GpxData) {
+  return nearestTrackpoint(epochMs, gpx);
+}
+
+export const MAX_MATCH_GAP_MINUTES = MAX_MATCH_GAP_MIN;
+
 // --- main -------------------------------------------------------------------
 
 /**
@@ -187,12 +258,14 @@ async function ensureDerivative(
  * WebP derivatives + a blur-up placeholder, and apply `_photos.json` overrides.
  * Never throws on a bad individual photo — it's skipped with diagnostics.
  */
-export async function processHikePhotos(entry: HikeEntry, gpx: GpxData | null): Promise<HikePhotos> {
-  const dir = hikeDir(entry);
+export async function processHikePhotos(
+  input: HikePhotoInput,
+  gpx: GpxData | null,
+): Promise<HikePhotos> {
+  const { slug, dir, cover: coverField } = input;
   const photosDir = path.join(dir, 'photos');
   const overrides = readOverrides(photosDir);
   const files = listPhotoFiles(photosDir);
-  const slug = entry.id;
 
   const photos: ProcessedPhoto[] = [];
 
@@ -214,26 +287,7 @@ export async function processHikePhotos(entry: HikeEntry, gpx: GpxData | null): 
       const blur = `data:image/webp;base64,${blurBuf.toString('base64')}`;
 
       // EXIF read from the ORIGINAL bytes (works for HEIC + JPEG).
-      let gps: { latitude?: number; longitude?: number } | undefined;
-      let timeData: Record<string, unknown> | undefined;
-      try {
-        gps = await exifr.gps(fs.readFileSync(absPath));
-      } catch {
-        gps = undefined;
-      }
-      try {
-        timeData = await exifr.parse(fs.readFileSync(absPath), {
-          reviveValues: false,
-          pick: ['DateTimeOriginal', 'OffsetTimeOriginal', 'CreateDate', 'OffsetTime'],
-        });
-      } catch {
-        timeData = undefined;
-      }
-
-      const hadExifGps = gps?.latitude != null && gps?.longitude != null;
-      const dtRaw = (timeData?.DateTimeOriginal ?? timeData?.CreateDate) as string | undefined;
-      const offRaw = (timeData?.OffsetTimeOriginal ?? timeData?.OffsetTime) as string | undefined;
-      const epoch = dtRaw ? exifToEpochMs(dtRaw, offRaw) : null;
+      const exif = await inspectPhotoExif(absPath);
 
       // Placement priority: override → EXIF GPS → timestamp → unplaced.
       let lat: number | null = null;
@@ -247,12 +301,12 @@ export async function processHikePhotos(entry: HikeEntry, gpx: GpxData | null): 
         lat = ov.lat;
         lng = ov.lng;
         source = 'override';
-      } else if (hadExifGps) {
-        lat = gps!.latitude!;
-        lng = gps!.longitude!;
+      } else if (exif.hasGps) {
+        lat = exif.lat;
+        lng = exif.lng;
         source = 'exif-gps';
-      } else if (epoch && gpx) {
-        const match = nearestTrackpoint(epoch.ms, gpx);
+      } else if (exif.epochMs != null && gpx) {
+        const match = nearestTrackpoint(exif.epochMs, gpx);
         if (match && match.gapMin <= MAX_MATCH_GAP_MIN) {
           lat = match.lat;
           lng = match.lng;
@@ -276,9 +330,9 @@ export async function processHikePhotos(entry: HikeEntry, gpx: GpxData | null): 
         blur,
         derivatives: { thumb, medium, full },
         diagnostics: {
-          hadExifGps,
-          hadExifTime: !!epoch,
-          exifOffsetSource: epoch ? epoch.offsetSource : 'none',
+          hadExifGps: exif.hasGps,
+          hadExifTime: exif.hasTime,
+          exifOffsetSource: exif.offsetSource,
           matchGapMinutes,
         },
       });
@@ -293,8 +347,8 @@ export async function processHikePhotos(entry: HikeEntry, gpx: GpxData | null): 
 
   // Cover: frontmatter cover (matched by filename) else first photo.
   let cover: ProcessedPhoto | null = photos[0] ?? null;
-  if (entry.data.cover) {
-    const coverName = path.basename(entry.data.cover);
+  if (coverField) {
+    const coverName = path.basename(coverField);
     cover = photos.find((p) => p.filename === coverName) ?? cover;
   }
 

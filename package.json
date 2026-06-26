@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
-    "build": "astro build",
+    "build": "astro build && pagefind --site dist",
     "preview": "astro preview",
+    "validate": "tsx scripts/validate.mjs",
     "astro": "astro"
   },
   "dependencies": {
@@ -18,5 +19,10 @@
     "heic-convert": "^2.1.0",
     "maplibre-gl": "^5.24.0",
     "sharp": "^0.35.2"
+  },
+  "devDependencies": {
+    "gray-matter": "^4.0.3",
+    "pagefind": "^1.5.2",
+    "tsx": "^4.22.4"
   }
 }

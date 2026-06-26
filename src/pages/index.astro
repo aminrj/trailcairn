@@ -1,6 +1,8 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Map from '../components/Map.astro';
+import LifetimeBand from '../components/LifetimeBand.astro';
+import Search from '../components/Search.astro';
 import { SITE_TAGLINE } from '../consts';
 import { getVisibleHikes, getIndexMapData } from '../lib/hikes';
 
@@ -13,11 +15,10 @@ const dateFmt = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
 <BaseLayout>
   <section class="hike-header">
     <h1>{SITE_TAGLINE}</h1>
-    <p class="prose">
-      A public ledger of hikes. Every track below sits on the lifetime map; the summary stats band
-      and search arrive in a later slice.
-    </p>
+    <p class="prose">A public ledger of hikes. Every track sits on the lifetime map below.</p>
   </section>
+
+  <LifetimeBand stats={mapData.lifetime} />
 
   {
     mapData.bounds && (
@@ -31,6 +32,8 @@ const dateFmt = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
       />
     )
   }
+
+  <Search />
 
   {
     hikes.length === 0 ? (

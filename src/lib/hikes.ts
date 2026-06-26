@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { Feature, LineString } from 'geojson';
 import { getCollection, type CollectionEntry } from 'astro:content';
 import { GpxError, parseGpx, type GpxData, type HikeStats } from './gpx';
+import { aggregateLifetime, type LifetimeStats, type HikeStatLine } from './stats';
 
 export type HikeEntry = CollectionEntry<'hikes'>;
 
@@ -61,6 +62,7 @@ export interface IndexMapData {
   starts: ([number, number] | null)[];
   hikes: IndexMapHike[];
   bounds: [[number, number], [number, number]] | null;
+  lifetime: LifetimeStats;
 }
 
 /**
@@ -76,19 +78,29 @@ export async function getIndexMapData(): Promise<IndexMapData> {
   const lines: Feature<LineString>[] = [];
   const starts: ([number, number] | null)[] = [];
   const meta: IndexMapHike[] = [];
+  const statLines: HikeStatLine[] = [];
   let minLon = Infinity;
   let minLat = Infinity;
   let maxLon = -Infinity;
   let maxLat = -Infinity;
 
   for (const hike of hikes) {
-    let gpx: GpxData;
+    let gpx: GpxData | null = null;
     try {
       gpx = loadGpx(hike);
     } catch (err) {
-      if (err instanceof GpxError) continue; // unusable track → omit from map
-      throw err;
+      if (!(err instanceof GpxError)) throw err; // unusable track → omit from map, still counted
     }
+
+    // Lifetime totals count every visible hike (derived or overridden stats).
+    statLines.push({
+      distance_km: hike.data.distance_km ?? gpx?.stats.distance_km ?? null,
+      ascent_m: hike.data.ascent_m ?? gpx?.stats.ascent_m ?? null,
+      date: hike.data.date,
+    });
+
+    if (!gpx) continue; // no track → not on the map
+
     lines.push(gpx.line);
     starts.push(hike.data.hidePrecisePins ? null : gpx.start);
     meta.push({
@@ -113,5 +125,5 @@ export async function getIndexMapData(): Promise<IndexMapData> {
         ]
       : null;
 
-  return { lines, starts, hikes: meta, bounds };
+  return { lines, starts, hikes: meta, bounds, lifetime: aggregateLifetime(statLines) };
 }

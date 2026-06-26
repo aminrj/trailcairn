@@ -6,7 +6,7 @@ import type { MapPhoto } from '../../components/Map.astro';
 import StatsBand from '../../components/StatsBand.astro';
 import ElevationProfile from '../../components/ElevationProfile.astro';
 import Gallery from '../../components/Gallery.astro';
-import { getVisibleHikes, loadGpx, resolveStats } from '../../lib/hikes';
+import { getVisibleHikes, hikeDir, loadGpx, resolveStats } from '../../lib/hikes';
 import { GpxError } from '../../lib/gpx';
 import { processHikePhotos } from '../../lib/photos';
 
@@ -39,7 +39,10 @@ const stats = gpx
     };
 
 // Photos: EXIF/timestamp placement + derivatives (slice 4).
-const { photos } = await processHikePhotos(hike, gpx);
+const { photos } = await processHikePhotos(
+  { slug: hike.id, dir: hikeDir(hike), cover: hike.data.cover },
+  gpx,
+);
 const mapPhotos: MapPhoto[] = photos
   .map((p, index) => ({ p, index }))
   .filter(({ p }) => p.placed)
@@ -54,10 +57,12 @@ const mapPhotos: MapPhoto[] = photos
 ---
 
 <BaseLayout title={hike.data.title} description={hike.data.summary}>
-  <article>
+  <article data-pagefind-body>
     <header class="hike-header">
       <h1>{hike.data.title}</h1>
-      <p class="prose">{hike.data.summary}</p>
+      <p class="prose" data-pagefind-meta="summary">{hike.data.summary}</p>
+      <span hidden data-pagefind-meta="location">{hike.data.location}</span>
+      {hike.data.tags.map((t) => <span hidden data-pagefind-filter="tag">{t}</span>)}
     </header>
 
     {
