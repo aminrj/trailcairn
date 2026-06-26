@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tiny synthetic track for the bundled example hike. Not a real place.
+     A short out-and-back over a fictional ridge with a little elevation. -->
+<gpx version="1.1" creator="trailcairn-example" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>Example ridge loop</name>
+    <trkseg>
+      <trkpt lat="61.5700" lon="12.7000"><ele>820</ele><time>2026-06-14T08:00:00Z</time></trkpt>
+      <trkpt lat="61.5712" lon="12.7035"><ele>858</ele><time>2026-06-14T08:18:00Z</time></trkpt>
+      <trkpt lat="61.5726" lon="12.7068"><ele>902</ele><time>2026-06-14T08:39:00Z</time></trkpt>
+      <trkpt lat="61.5741" lon="12.7102"><ele>951</ele><time>2026-06-14T09:03:00Z</time></trkpt>
+      <trkpt lat="61.5755" lon="12.7139"><ele>984</ele><time>2026-06-14T09:28:00Z</time></trkpt>
+      <trkpt lat="61.5742" lon="12.7170"><ele>958</ele><time>2026-06-14T09:50:00Z</time></trkpt>
+      <trkpt lat="61.5728" lon="12.7150"><ele>915</ele><time>2026-06-14T10:12:00Z</time></trkpt>
+      <trkpt lat="61.5714" lon="12.7110"><ele>871</ele><time>2026-06-14T10:36:00Z</time></trkpt>
+      <trkpt lat="61.5701" lon="12.7062"><ele>838</ele><time>2026-06-14T11:01:00Z</time></trkpt>
+      <trkpt lat="61.5698" lon="12.7008"><ele>822</ele><time>2026-06-14T11:24:00Z</time></trkpt>
+    </trkseg>
+  </trk>
+</gpx>

@@ -1,0 +1,239 @@
+---
+import type { Feature, LineString } from 'geojson';
+import { MAP_STYLE_URL } from '../lib/map';
+
+export interface MapPhoto {
+  lng: number;
+  lat: number;
+  thumb: string;
+  full: string;
+  caption?: string;
+  index: number;
+}
+
+export interface MapHike {
+  slug: string;
+  title: string;
+  date: string;
+  distance_km: number | null;
+  cover?: string | null;
+}
+
+interface Props {
+  /** Unique DOM id for this map instance. */
+  id: string;
+  /** One or more track lines to draw. */
+  lines: Feature<LineString>[];
+  /** Start pins, [lon, lat]. */
+  starts?: [number, number][];
+  /** Bounds [[minLon,minLat],[maxLon,maxLat]] to fit on load. */
+  bounds: [[number, number], [number, number]];
+  /** Optional per-hike metadata for index popups, keyed by line index. */
+  hikes?: (MapHike | null)[];
+  /** Optional photo markers (per-hike map). */
+  photos?: MapPhoto[];
+  /** Animate a line-draw reveal (single-track pages). Default false. */
+  reveal?: boolean;
+  height?: string;
+}
+
+const {
+  id,
+  lines,
+  starts = [],
+  bounds,
+  hikes = [],
+  photos = [],
+  reveal = false,
+  height = '60vh',
+} = Astro.props;
+
+const config = { styleUrl: MAP_STYLE_URL, lines, starts, bounds, hikes, photos, reveal };
+---
+
+<div class="maplibre-map" id={id} data-map style={`--map-height:${height}`}>
+  <script type="application/json" class="map-config" set:html={JSON.stringify(config)}></script>
+  <noscript>
+    <p class="map-fallback">An interactive map requires JavaScript.</p>
+  </noscript>
+</div>
+
+<style>
+  .maplibre-map {
+    position: relative;
+    width: 100%;
+    height: var(--map-height, 60vh);
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--line, #e4e0d8);
+    background: #eef1f0;
+  }
+  .map-fallback {
+    padding: 1rem;
+    font-size: 0.9rem;
+  }
+  /* Photo markers are small thumbnails (SPEC §6). */
+  :global(.photo-marker) {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+    background-size: cover;
+    background-position: center;
+    cursor: pointer;
+  }
+  :global(.maplibregl-popup-content) {
+    font-family: var(--font-body, sans-serif);
+    font-size: 0.85rem;
+  }
+</style>
+
+<script>
+  import maplibregl from 'maplibre-gl';
+  import 'maplibre-gl/dist/maplibre-gl.css';
+
+  type Cfg = {
+    styleUrl: string;
+    lines: GeoJSON.Feature<GeoJSON.LineString>[];
+    starts: [number, number][];
+    bounds: [[number, number], [number, number]];
+    hikes: ({ slug: string; title: string; date: string; distance_km: number | null } | null)[];
+    photos: { lng: number; lat: number; thumb: string; full: string; caption?: string; index: number }[];
+    reveal: boolean;
+  };
+
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function initMap(el: HTMLElement) {
+    if (el.dataset.mapReady) return;
+    el.dataset.mapReady = 'true';
+    const cfgEl = el.querySelector('.map-config');
+    if (!cfgEl?.textContent) return;
+    const cfg: Cfg = JSON.parse(cfgEl.textContent);
+
+    const map = new maplibregl.Map({
+      container: el,
+      style: cfg.styleUrl,
+      bounds: cfg.bounds,
+      fitBoundsOptions: { padding: 48, animate: false },
+      attributionControl: { compact: true },
+    });
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+
+    map.on('load', () => {
+      const fullLines: GeoJSON.FeatureCollection = {
+        type: 'FeatureCollection',
+        features: cfg.lines.map((line, i) => ({ ...line, properties: { ...line.properties, idx: i } })),
+      };
+
+      map.addSource('tracks', { type: 'geojson', data: fullLines, lineMetrics: true });
+      map.addLayer({
+        id: 'tracks-line',
+        type: 'line',
+        source: 'tracks',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#c0392b', 'line-width': 3.5, 'line-opacity': 0.9 },
+      });
+
+      if (cfg.starts.length) {
+        map.addSource('starts', {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: cfg.starts.map((s, i) => ({
+              type: 'Feature',
+              properties: { idx: i },
+              geometry: { type: 'Point', coordinates: s },
+            })),
+          },
+        });
+        map.addLayer({
+          id: 'starts-circle',
+          type: 'circle',
+          source: 'starts',
+          paint: {
+            'circle-radius': 6,
+            'circle-color': '#3f6b4d',
+            'circle-stroke-color': '#fff',
+            'circle-stroke-width': 2,
+          },
+        });
+      }
+
+      // Index popups: clicking a track or start pin opens a small card → hike page.
+      if (cfg.hikes.length) {
+        const openPopup = (idx: number, lngLat: maplibregl.LngLatLike) => {
+          const hike = cfg.hikes[idx];
+          if (!hike) return;
+          const dist = hike.distance_km != null ? ` · ${hike.distance_km} km` : '';
+          new maplibregl.Popup({ closeButton: false, offset: 10 })
+            .setLngLat(lngLat)
+            .setHTML(
+              `<a href="/hikes/${hike.slug}" style="text-decoration:none;color:inherit">` +
+                `<strong>${hike.title}</strong><br><span style="opacity:.7">${hike.date}${dist}</span></a>`,
+            )
+            .addTo(map);
+        };
+        for (const layer of ['tracks-line', 'starts-circle']) {
+          if (!map.getLayer(layer)) continue;
+          map.on('click', layer, (e) => {
+            const idx = (e.features?.[0]?.properties?.idx as number) ?? 0;
+            openPopup(idx, e.lngLat);
+          });
+          map.on('mouseenter', layer, () => (map.getCanvas().style.cursor = 'pointer'));
+          map.on('mouseleave', layer, () => (map.getCanvas().style.cursor = ''));
+        }
+      }
+
+      // Photo markers (per-hike map). HTML thumbnail markers; clicking opens the lightbox.
+      for (const photo of cfg.photos) {
+        const node = document.createElement('div');
+        node.className = 'photo-marker';
+        node.style.backgroundImage = `url("${photo.thumb}")`;
+        node.title = photo.caption ?? '';
+        node.addEventListener('click', () => {
+          el.dispatchEvent(
+            new CustomEvent('photo-marker-click', { bubbles: true, detail: { index: photo.index } }),
+          );
+        });
+        new maplibregl.Marker({ element: node, anchor: 'center' })
+          .setLngLat([photo.lng, photo.lat])
+          .addTo(map);
+      }
+
+      // Subtle line-draw reveal on single-track pages (SPEC §7), reduced-motion aware.
+      if (cfg.reveal && !prefersReducedMotion && cfg.lines.length === 1) {
+        const coords = cfg.lines[0].geometry.coordinates;
+        const source = map.getSource('tracks') as maplibregl.GeoJSONSource;
+        const duration = 900;
+        const start = performance.now();
+        const step = (now: number) => {
+          const t = Math.min(1, (now - start) / duration);
+          const count = Math.max(2, Math.floor(t * coords.length));
+          source.setData({
+            type: 'FeatureCollection',
+            features: [
+              { type: 'Feature', properties: { idx: 0 }, geometry: { type: 'LineString', coordinates: coords.slice(0, count) } },
+            ],
+          });
+          if (t < 1) requestAnimationFrame(step);
+          else source.setData(fullLines);
+        };
+        // begin from an empty-ish line
+        source.setData({
+          type: 'FeatureCollection',
+          features: [{ type: 'Feature', properties: { idx: 0 }, geometry: { type: 'LineString', coordinates: coords.slice(0, 2) } }],
+        });
+        requestAnimationFrame(step);
+      }
+    });
+
+    // Expose for the page (lightbox ↔ map fly-to wiring).
+    (el as any).__map = map;
+  }
+
+  const init = () => document.querySelectorAll<HTMLElement>('[data-map]').forEach(initMap);
+  if (document.readyState !== 'loading') init();
+  else document.addEventListener('DOMContentLoaded', init);
+</script>

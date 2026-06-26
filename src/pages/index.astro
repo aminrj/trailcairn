@@ -1,0 +1,45 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { SITE_NAME, SITE_TAGLINE } from '../consts';
+
+// Draft hikes render in dev but are excluded from production builds (SPEC §2.1).
+const hikes = (await getCollection('hikes'))
+  .filter((h) => import.meta.env.DEV || h.data.status !== 'draft')
+  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+
+const dateFmt = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
+---
+
+<BaseLayout>
+  <section class="hike-header">
+    <h1>{SITE_TAGLINE}</h1>
+    <p class="prose">
+      A public ledger of hikes. The lifetime map and summary stats land in the next slice —
+      for now this is the logbook.
+    </p>
+  </section>
+
+  {
+    hikes.length === 0 ? (
+      <p class="placeholder-note">
+        No hikes yet. Copy <code>src/content/hikes/_TEMPLATE/</code> to a new folder to add one.
+      </p>
+    ) : (
+      <ul class="hike-list">
+        {hikes.map((hike) => (
+          <li class="hike-card">
+            <h2>
+              <a href={`/hikes/${hike.id}`}>{hike.data.title}</a>{' '}
+              {hike.data.status === 'draft' && <span class="draft-badge">draft</span>}
+            </h2>
+            <p class="meta">
+              {dateFmt.format(hike.data.date)} · {hike.data.location}
+            </p>
+            <p>{hike.data.summary}</p>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+</BaseLayout>

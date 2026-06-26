@@ -1,0 +1,60 @@
+---
+// Simple static SVG elevation profile (SPEC §3.2 — a static profile is fine for
+// v1; hover-to-locate is a deferred nice-to-have). No client JS.
+interface Props {
+  elevations: number[];
+  cumulativeKm: number[];
+  height?: number;
+}
+const { elevations, cumulativeKm, height = 160 } = Astro.props;
+
+const W = 1000;
+const H = height;
+const pad = 4;
+
+const hasData = elevations.length >= 2 && cumulativeKm.length === elevations.length;
+const totalKm = hasData ? cumulativeKm[cumulativeKm.length - 1] : 0;
+const minEle = hasData ? Math.min(...elevations) : 0;
+const maxEle = hasData ? Math.max(...elevations) : 0;
+const eleRange = Math.max(1, maxEle - minEle);
+
+function x(km: number): number {
+  return totalKm > 0 ? (km / totalKm) * (W - pad * 2) + pad : pad;
+}
+function y(ele: number): number {
+  return H - pad - ((ele - minEle) / eleRange) * (H - pad * 2);
+}
+
+const linePath = hasData
+  ? elevations.map((e, i) => `${i === 0 ? 'M' : 'L'}${x(cumulativeKm[i]).toFixed(1)},${y(e).toFixed(1)}`).join(' ')
+  : '';
+const areaPath = hasData ? `${linePath} L${x(totalKm).toFixed(1)},${H - pad} L${pad},${H - pad} Z` : '';
+---
+
+{
+  hasData && (maxEle > minEle) && (
+    <figure class="elevation">
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={`Elevation profile: ${Math.round(minEle)}–${Math.round(maxEle)} m over ${totalKm.toFixed(1)} km`}>
+        <path d={areaPath} fill="rgba(63,107,77,0.14)" />
+        <path d={linePath} fill="none" stroke="#3f6b4d" stroke-width="2" vector-effect="non-scaling-stroke" />
+      </svg>
+      <figcaption class="meta">
+        {Math.round(minEle)}–{Math.round(maxEle)} m · {totalKm.toFixed(1)} km
+      </figcaption>
+    </figure>
+  )
+}
+
+<style>
+  .elevation svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    background: #fff;
+    border: 1px solid var(--line, #e4e0d8);
+    border-radius: 8px;
+  }
+  .elevation figcaption {
+    margin-top: 0.4rem;
+  }
+</style>

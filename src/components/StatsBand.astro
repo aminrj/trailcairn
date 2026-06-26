@@ -1,0 +1,33 @@
+---
+// Per-hike stats band (SPEC §5), rendered in mono. Values are already
+// resolved (derived-or-overridden); pass null for unknowns.
+interface Props {
+  date: string;
+  location: string;
+  distance_km: number | null;
+  ascent_m: number | null;
+  descent_m: number | null;
+  duration: string | null;
+}
+const { date, location, distance_km, ascent_m, descent_m, duration } = Astro.props;
+
+const stats: { label: string; value: string }[] = [
+  { label: 'Date', value: date },
+  { label: 'Location', value: location },
+  { label: 'Distance', value: distance_km != null ? `${distance_km} km` : '—' },
+  { label: 'Ascent', value: ascent_m != null ? `${ascent_m} m` : '—' },
+  { label: 'Descent', value: descent_m != null ? `${descent_m} m` : '—' },
+  { label: 'Duration', value: duration ?? '—' },
+];
+---
+
+<div class="statsband">
+  {
+    stats.map((s) => (
+      <div class="stat">
+        <span class="label">{s.label}</span>
+        <span class="value">{s.value}</span>
+      </div>
+    ))
+  }
+</div>

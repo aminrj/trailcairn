@@ -1,0 +1,18 @@
+{
+  "_comment": "OPTIONAL manual overrides, keyed by photo filename. Delete this file if you don't need it. Anything set here wins over EXIF GPS and timestamp matching. All keys per photo are optional.",
+
+  "IMG_0001.jpg": {
+    "caption": "A caption shown in the gallery and marker popup"
+  },
+  "IMG_0002.jpg": {
+    "lat": 61.573,
+    "lng": 12.7,
+    "caption": "Pin this photo here manually (use when it landed in the wrong spot)"
+  },
+  "IMG_0003.jpg": {
+    "order": 1
+  },
+  "IMG_0004.jpg": {
+    "place": false
+  }
+}

@@ -1,0 +1,82 @@
+---
+import { render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Map from '../../components/Map.astro';
+import StatsBand from '../../components/StatsBand.astro';
+import ElevationProfile from '../../components/ElevationProfile.astro';
+import { getVisibleHikes, loadGpx, resolveStats } from '../../lib/hikes';
+import { GpxError } from '../../lib/gpx';
+
+export async function getStaticPaths() {
+  const hikes = await getVisibleHikes();
+  return hikes.map((hike) => ({ params: { slug: hike.id }, props: { hike } }));
+}
+
+const { hike } = Astro.props;
+const { Content } = await render(hike);
+
+const dateFmt = new Intl.DateTimeFormat('en', { dateStyle: 'long' });
+
+// Derive from the GPX at build time; frontmatter overrides win (SPEC §2.1).
+let gpx = null;
+let gpxErrorMessage: string | null = null;
+try {
+  gpx = loadGpx(hike);
+} catch (err) {
+  if (err instanceof GpxError) gpxErrorMessage = err.message;
+  else throw err;
+}
+const stats = gpx
+  ? resolveStats(hike, gpx.stats)
+  : {
+      distance_km: hike.data.distance_km ?? null,
+      ascent_m: hike.data.ascent_m ?? null,
+      descent_m: hike.data.descent_m ?? null,
+      duration: hike.data.duration ?? null,
+    };
+---
+
+<BaseLayout title={hike.data.title} description={hike.data.summary}>
+  <article>
+    <header class="hike-header">
+      <h1>{hike.data.title}</h1>
+      <p class="prose">{hike.data.summary}</p>
+    </header>
+
+    {
+      gpx ? (
+        <Map
+          id={`map-${hike.id}`}
+          lines={[gpx.line]}
+          starts={hike.data.hidePrecisePins ? [] : [gpx.start]}
+          bounds={gpx.bounds}
+          reveal={true}
+          height="55vh"
+        />
+      ) : (
+        <p class="placeholder-note">Could not render the track: {gpxErrorMessage}</p>
+      )
+    }
+
+    <StatsBand
+      date={dateFmt.format(hike.data.date)}
+      location={hike.data.location}
+      distance_km={stats.distance_km}
+      ascent_m={stats.ascent_m}
+      descent_m={stats.descent_m}
+      duration={stats.duration}
+    />
+
+    {gpx && <ElevationProfile elevations={gpx.elevations} cumulativeKm={gpx.cumulativeKm} />}
+
+    <div class="prose hike-body">
+      <Content />
+    </div>
+  </article>
+</BaseLayout>
+
+<style>
+  .hike-body {
+    margin-top: 2rem;
+  }
+</style>

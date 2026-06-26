@@ -1,0 +1,21 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { SITE_NAME } from '../consts';
+---
+
+<BaseLayout title="About">
+  <section class="hike-header">
+    <h1>About</h1>
+  </section>
+  <div class="prose">
+    <p>
+      {SITE_NAME} is a personal, lifetime hiking diary — a public ledger of hikes. Each hike has a
+      GPX track shown on a map, photos placed along that track, derived stats, and a written diary
+      entry.
+    </p>
+    <p>
+      It is a static site: the source of truth is plain files (Markdown, GPX, and photos), one
+      folder per hike. There is no database and no account system.
+    </p>
+  </div>
+</BaseLayout>
