@@ -1,0 +1,21 @@
+# Dependencies & build output
+node_modules/
+dist/
+.astro/
+.env
+.env.*
+!.env.example
+
+# Raw Google Takeout / staging area for un-curated data
+test-data/
+takeout/
+
+# Personal hike data — ignore ALL real hikes by default,
+# but keep the bundled example and template committed.
+src/content/hikes/*/
+!src/content/hikes/_example/
+!src/content/hikes/_TEMPLATE/
+
+# OS noise
+.DS_Store
+Thumbs.db
