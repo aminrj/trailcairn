@@ -109,41 +109,53 @@ a {
   padding: 2rem 0;
 }
 
-/* Hike logbook list (index) */
+/* Home hero (index): title + lifetime stats + overview map as one unit. */
+.home-hero {
+  margin: 2.5rem 0 0;
+}
+.home-hero h1 {
+  font-size: clamp(2rem, 5vw, 3rem);
+  margin: 0 0 0.4rem;
+}
+.home-sub {
+  margin: 0;
+  max-width: 52ch;
+  color: var(--ink-soft);
+}
+
+/* Hike logbook (index): a quiet, uniform list — rows, not boxes. */
 .hike-list {
   list-style: none;
   padding: 0;
-  margin: 2rem 0 0;
-  display: grid;
-  gap: 1.5rem;
+  margin: 2.5rem 0 0;
 }
 .hike-card {
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 1.25rem 1.5rem;
-  background: #fff;
-  transition:
-    border-color 0.18s ease,
-    transform 0.18s ease;
+  padding: 1.05rem 0;
+  border-top: 1px solid var(--line);
 }
-.hike-card:hover {
-  border-color: var(--accent);
-  transform: translateY(-2px);
+.hike-list .hike-card:last-child {
+  border-bottom: 1px solid var(--line);
 }
 .hike-card h2 {
-  margin: 0 0 0.25rem;
-  font-size: 1.3rem;
+  margin: 0 0 0.15rem;
+  font-size: 1.15rem;
+  font-weight: 600;
 }
 .hike-card h2 a {
   color: var(--ink);
   text-decoration: none;
+  transition: color 0.15s ease;
 }
 .hike-card h2 a:hover {
   color: var(--accent);
 }
 .hike-card p {
-  margin: 0.5rem 0 0;
+  margin: 0.3rem 0 0;
   color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+.hike-card p.meta {
+  margin: 0;
 }
 .draft-badge {
   font-family: var(--font-mono);

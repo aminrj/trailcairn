@@ -13,9 +13,9 @@ const dateFmt = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
 ---
 
 <BaseLayout>
-  <section class="hike-header">
+  <section class="home-hero">
     <h1>{SITE_TAGLINE}</h1>
-    <p class="prose">A public ledger of hikes. Every track sits on the lifetime map below.</p>
+    <p class="home-sub">A personal, public ledger of where I've wandered — every hike mapped.</p>
   </section>
 
   <LifetimeBand stats={mapData.lifetime} />
