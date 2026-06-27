@@ -125,18 +125,16 @@ const config = { mapId, coordinates, timeline, cumulativeKm, totalKm, durationSe
   :global(.replay-marker.is-active) {
     display: block;
   }
-  /* Vertical cursor over the elevation profile. */
-  :global(.elevation) {
-    position: relative;
-  }
+  /* Vertical cursor over the elevation profile plot. */
   :global(.replay-cursor) {
     position: absolute;
     top: 0;
-    bottom: 1.4rem;
+    bottom: 0;
     width: 2px;
     background: rgba(192, 57, 43, 0.8);
     pointer-events: none;
     display: none;
+    z-index: 2;
   }
   :global(.replay-cursor.is-active) {
     display: block;
@@ -186,7 +184,7 @@ const config = { mapId, coordinates, timeline, cumulativeKm, totalKm, durationSe
       marker.className = 'replay-marker';
       mapEl!.appendChild(marker);
 
-      const profile = document.querySelector<HTMLElement>('.elevation');
+      const profile = document.querySelector<HTMLElement>('.elevation-plot');
       let cursor: HTMLElement | null = null;
       if (profile) {
         cursor = document.createElement('div');

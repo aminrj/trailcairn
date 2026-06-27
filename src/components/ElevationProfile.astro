@@ -1,43 +1,81 @@
 ---
-// Simple static SVG elevation profile (SPEC §3.2 — a static profile is fine for
-// v1; hover-to-locate is a deferred nice-to-have). No client JS.
+// Simple static SVG elevation profile (SPEC §3.2) with a labelled metre Y-axis.
+// Gridlines live in the (horizontally-stretched) SVG — horizontal lines survive
+// the stretch — while the axis labels are crisp mono HTML in a left gutter,
+// aligned to the gridlines by percentage.
 interface Props {
   elevations: number[];
   cumulativeKm: number[];
   height?: number;
 }
-const { elevations, cumulativeKm, height = 160 } = Astro.props;
+const { elevations, cumulativeKm, height = 150 } = Astro.props;
 
 const W = 1000;
-const H = height;
-const pad = 4;
+const H = 100; // SVG user-units; stretched to the plot box by preserveAspectRatio=none
+const padX = 4;
 
 const hasData = elevations.length >= 2 && cumulativeKm.length === elevations.length;
 const totalKm = hasData ? cumulativeKm[cumulativeKm.length - 1] : 0;
 const minEle = hasData ? Math.min(...elevations) : 0;
 const maxEle = hasData ? Math.max(...elevations) : 0;
-const eleRange = Math.max(1, maxEle - minEle);
 
-function x(km: number): number {
-  return totalKm > 0 ? (km / totalKm) * (W - pad * 2) + pad : pad;
+// "Nice" axis bounds + ticks (min, max, a couple intermediate).
+function niceAxis(min: number, max: number) {
+  const range = Math.max(1, max - min);
+  // Aim for ~4-5 intervals; small steps keep flat hikes from collapsing to
+  // just min/max.
+  const steps = [2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000];
+  let step = steps[steps.length - 1];
+  for (const s of steps) {
+    if (range / s <= 4.5) {
+      step = s;
+      break;
+    }
+  }
+  const axisMin = Math.floor(min / step) * step;
+  const axisMax = Math.ceil(max / step) * step;
+  const ticks: number[] = [];
+  for (let v = axisMin; v <= axisMax + 1e-6; v += step) ticks.push(v);
+  return { axisMin, axisMax, ticks };
 }
-function y(ele: number): number {
-  return H - pad - ((ele - minEle) / eleRange) * (H - pad * 2);
-}
+const { axisMin, axisMax, ticks } = niceAxis(minEle, maxEle);
+const axisRange = Math.max(1, axisMax - axisMin);
+
+const x = (km: number) => (totalKm > 0 ? (km / totalKm) * (W - padX * 2) + padX : padX);
+const y = (ele: number) => H - ((ele - axisMin) / axisRange) * H;
+// Vertical position as a percentage of the plot box (for HTML labels).
+const pct = (ele: number) => ((axisMax - ele) / axisRange) * 100;
 
 const linePath = hasData
   ? elevations.map((e, i) => `${i === 0 ? 'M' : 'L'}${x(cumulativeKm[i]).toFixed(1)},${y(e).toFixed(1)}`).join(' ')
   : '';
-const areaPath = hasData ? `${linePath} L${x(totalKm).toFixed(1)},${H - pad} L${pad},${H - pad} Z` : '';
+const areaPath = hasData ? `${linePath} L${x(totalKm).toFixed(1)},${H} L${padX},${H} Z` : '';
 ---
 
 {
-  hasData && (maxEle > minEle) && (
+  hasData && maxEle > minEle && (
     <figure class="elevation">
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={`Elevation profile: ${Math.round(minEle)}–${Math.round(maxEle)} m over ${totalKm.toFixed(1)} km`}>
-        <path d={areaPath} fill="rgba(63,107,77,0.14)" />
-        <path d={linePath} fill="none" stroke="#3f6b4d" stroke-width="2" vector-effect="non-scaling-stroke" />
-      </svg>
+      <div class="elevation-plot" style={`height:${height}px`}>
+        <div class="elevation-yaxis">
+          {ticks.map((t) => (
+            <span class="ytick" style={`top:${pct(t).toFixed(2)}%`}>
+              {Math.round(t)}
+            </span>
+          ))}
+        </div>
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          preserveAspectRatio="none"
+          role="img"
+          aria-label={`Elevation profile: ${Math.round(minEle)} to ${Math.round(maxEle)} m over ${totalKm.toFixed(1)} km`}
+        >
+          {ticks.map((t) => (
+            <line x1="0" x2={W} y1={y(t).toFixed(1)} y2={y(t).toFixed(1)} class="gridline" vector-effect="non-scaling-stroke" />
+          ))}
+          <path d={areaPath} fill="rgba(63,107,77,0.14)" />
+          <path d={linePath} fill="none" stroke="#3f6b4d" stroke-width="2" vector-effect="non-scaling-stroke" />
+        </svg>
+      </div>
       <figcaption class="meta">
         {Math.round(minEle)}–{Math.round(maxEle)} m · {totalKm.toFixed(1)} km
       </figcaption>
@@ -46,13 +84,42 @@ const areaPath = hasData ? `${linePath} L${x(totalKm).toFixed(1)},${H - pad} L${
 }
 
 <style>
-  .elevation svg {
-    width: 100%;
-    height: auto;
-    display: block;
+  .elevation-plot {
+    position: relative;
     background: #fff;
     border: 1px solid var(--line, #e4e0d8);
     border-radius: 8px;
+    overflow: hidden;
+  }
+  .elevation-plot svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .gridline {
+    stroke: rgba(26, 26, 23, 0.08);
+    stroke-width: 1;
+  }
+  /* Labels overlay the left edge of the plot (so the SVG spans full width and
+     the replay cursor's left% maps cleanly to track position). */
+  .elevation-yaxis {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    pointer-events: none;
+  }
+  .ytick {
+    position: absolute;
+    left: 0.3rem;
+    transform: translateY(-50%);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.6rem;
+    color: var(--ink-soft, #5b5b54);
+    white-space: nowrap;
+    background: rgba(255, 255, 255, 0.72);
+    padding: 0 0.2rem;
+    border-radius: 2px;
   }
   .elevation figcaption {
     margin-top: 0.4rem;
