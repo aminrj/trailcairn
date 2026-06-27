@@ -47,6 +47,10 @@ const SATELLITE_STYLE = rasterStyle({
   maxzoom: 19,
 });
 
+// Pale, clean vector style — used as the index/overview default so the hike
+// pins are the visual subject. Keyless; ships glyphs (so map labels render).
+const PALE_STYLE = 'https://tiles.openfreemap.org/styles/positron';
+
 export interface Basemap {
   id: string;
   label: string;
@@ -62,12 +66,14 @@ const TOPO_OVERRIDE = process.env.MAP_STYLE_URL;
 
 export const BASEMAPS: Basemap[] = [
   { id: 'topo', label: 'Topo', style: TOPO_OVERRIDE ?? TOPO_STYLE, enabled: true },
-  { id: 'streets', label: 'Streets', style: 'https://tiles.openfreemap.org/styles/liberty', enabled: true },
+  { id: 'pale', label: 'Pale', style: PALE_STYLE, enabled: true },
   { id: 'satellite', label: 'Satellite', style: SATELLITE_STYLE, enabled: true },
 ];
 
 export const ENABLED_BASEMAPS = BASEMAPS.filter((b) => b.enabled !== false);
 
-/** Default basemap shown on first load. */
-export const DEFAULT_BASEMAP_ID = ENABLED_BASEMAPS[0]?.id ?? 'topo';
+/** Default basemap on per-hike maps (rich topo). */
+export const DEFAULT_BASEMAP_ID = 'topo';
+/** Default basemap on the index/overview map (pale, so pins pop). */
+export const OVERVIEW_BASEMAP_ID = 'pale';
 export const DEFAULT_BASEMAP_STYLE = ENABLED_BASEMAPS[0]?.style;

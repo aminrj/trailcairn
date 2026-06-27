@@ -34,6 +34,10 @@ interface Props {
   photos?: MapPhoto[];
   /** Animate a line-draw reveal (single-track pages). Default false. */
   reveal?: boolean;
+  /** Overview mode (index): clustered cairn pins + labels, faint tracks, zoomed-out fit. */
+  overview?: boolean;
+  /** Initial basemap id (defaults to the per-hike topo). */
+  defaultBasemap?: string;
   height?: string;
 }
 
@@ -45,18 +49,21 @@ const {
   hikes = [],
   photos = [],
   reveal = false,
+  overview = false,
+  defaultBasemap = DEFAULT_BASEMAP_ID,
   height = '60vh',
 } = Astro.props;
 
 const config = {
   basemaps: ENABLED_BASEMAPS.map((b) => ({ id: b.id, label: b.label, style: b.style })),
-  defaultBasemapId: DEFAULT_BASEMAP_ID,
+  defaultBasemapId: defaultBasemap,
   lines,
   starts,
   bounds,
   hikes,
   photos,
   reveal,
+  overview,
 };
 ---
 
@@ -127,19 +134,37 @@ const config = {
   import 'maplibre-gl/dist/maplibre-gl.css';
 
   type BasemapDef = { id: string; label: string; style: string | maplibregl.StyleSpecification };
+  type HikeMeta = { slug: string; title: string; date: string; distance_km: number | null };
   type Cfg = {
     basemaps: BasemapDef[];
     defaultBasemapId: string;
     lines: GeoJSON.Feature<GeoJSON.LineString>[];
     starts: ([number, number] | null)[];
     bounds: [[number, number], [number, number]];
-    hikes: ({ slug: string; title: string; date: string; distance_km: number | null } | null)[];
+    hikes: (HikeMeta | null)[];
     photos: { lng: number; lat: number; thumb: string; full: string; caption?: string; index: number }[];
     reveal: boolean;
+    overview: boolean;
   };
 
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const BASEMAP_KEY = 'trailcairn:basemap';
+
+  // Cairn-on-a-pin icon for the overview map. A teardrop pin with a small
+  // stacked-cairn motif. Drawn as SVG, loaded once and re-added per style.
+  const PIN_SVG = `<svg xmlns='http://www.w3.org/2000/svg' width='48' height='60' viewBox='0 0 48 60'>
+    <path d='M24 2 C12 2 3 11 3 23 C3 38 24 58 24 58 C24 58 45 38 45 23 C45 11 36 2 24 2 Z' fill='#3f6b4d' stroke='#ffffff' stroke-width='2.5'/>
+    <ellipse cx='24' cy='29' rx='9' ry='3.1' fill='#ffffff'/>
+    <ellipse cx='24' cy='23.5' rx='6.8' ry='2.7' fill='#ffffff'/>
+    <ellipse cx='24' cy='18.5' rx='4.8' ry='2.3' fill='#ffffff'/>
+    <circle cx='24' cy='14' r='2.5' fill='#ffffff'/>
+  </svg>`;
+  const pinImg = new Image();
+  const pinReady = new Promise<void>((res) => {
+    pinImg.onload = () => res();
+    pinImg.onerror = () => res();
+  });
+  pinImg.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(PIN_SVG)}`;
 
   // Small basemap switcher control (terrain / topo / satellite). Unobtrusive
   // segmented buttons; the choice is remembered for the session.
@@ -202,12 +227,27 @@ const config = {
           : null,
       )
       .filter((f): f is NonNullable<typeof f> => f !== null);
+    // Overview pins carry place/date for labels.
+    const pinFeatures = cfg.starts
+      .map((s, i) =>
+        s && cfg.hikes[i]
+          ? {
+              type: 'Feature' as const,
+              properties: { idx: i, title: cfg.hikes[i]!.title, date: cfg.hikes[i]!.date },
+              geometry: { type: 'Point' as const, coordinates: s },
+            }
+          : null,
+      )
+      .filter((f): f is NonNullable<typeof f> => f !== null);
 
     const map = new maplibregl.Map({
       container: el,
       style: styleFor(initialId),
       bounds: cfg.bounds,
-      fitBoundsOptions: { padding: 48, animate: false },
+      // Overview reads as "where I've wandered": breathing room, not a tight fit.
+      fitBoundsOptions: cfg.overview
+        ? { padding: 80, maxZoom: 8, animate: false }
+        : { padding: 48, animate: false },
       attributionControl: { compact: true },
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
@@ -225,7 +265,7 @@ const config = {
       );
     }
 
-    // Track + start-pin sources/layers. Re-added on every style load because
+    // Track + pin sources/layers. Re-added on every style load because
     // setStyle() clears non-basemap sources/layers.
     const addOverlayLayers = () => {
       if (!map.getSource('tracks')) {
@@ -235,10 +275,74 @@ const config = {
           type: 'line',
           source: 'tracks',
           layout: { 'line-cap': 'round', 'line-join': 'round' },
-          paint: { 'line-color': '#c0392b', 'line-width': 3.5, 'line-opacity': 0.9 },
+          // On the overview, tracks are quiet context; pins are the subject.
+          paint: cfg.overview
+            ? { 'line-color': '#7a5b52', 'line-width': 1.5, 'line-opacity': 0.5 }
+            : { 'line-color': '#c0392b', 'line-width': 3.5, 'line-opacity': 0.9 },
         });
       }
-      if (startFeatures.length && !map.getSource('starts')) {
+
+      if (cfg.overview) {
+        if (pinFeatures.length && !map.getSource('pins')) {
+          map.addSource('pins', {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: pinFeatures },
+            cluster: true,
+            clusterRadius: 46,
+            clusterMaxZoom: 9,
+          });
+          // Cluster bubbles (numbered).
+          map.addLayer({
+            id: 'pins-clusters',
+            type: 'circle',
+            source: 'pins',
+            filter: ['has', 'point_count'],
+            paint: {
+              'circle-color': '#3f6b4d',
+              'circle-opacity': 0.92,
+              'circle-stroke-color': '#fff',
+              'circle-stroke-width': 2,
+              'circle-radius': ['step', ['get', 'point_count'], 15, 5, 19, 10, 25],
+            },
+          });
+          map.addLayer({
+            id: 'pins-count',
+            type: 'symbol',
+            source: 'pins',
+            filter: ['has', 'point_count'],
+            layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': ['Noto Sans Bold'], 'text-size': 13 },
+            paint: { 'text-color': '#fff' },
+          });
+          // Individual cairn pins with a collision-aware place/date label.
+          map.addLayer({
+            id: 'pins-unclustered',
+            type: 'symbol',
+            source: 'pins',
+            filter: ['!', ['has', 'point_count']],
+            layout: {
+              'icon-image': 'hike-pin',
+              'icon-size': 1,
+              'icon-anchor': 'bottom',
+              'icon-allow-overlap': true,
+              'text-field': [
+                'format',
+                ['get', 'title'],
+                { 'font-scale': 1 },
+                '\n',
+                {},
+                ['get', 'date'],
+                { 'font-scale': 0.8, 'text-color': '#5b5b54' },
+              ],
+              'text-font': ['Noto Sans Bold'],
+              'text-size': 12,
+              'text-anchor': 'top',
+              'text-offset': [0, 0.5],
+              'text-optional': true, // show the pin even when the label collides
+            },
+            paint: { 'text-color': '#1a1a17', 'text-halo-color': '#faf8f4', 'text-halo-width': 1.6 },
+          });
+        }
+      } else if (startFeatures.length && !map.getSource('starts')) {
         map.addSource('starts', { type: 'geojson', data: { type: 'FeatureCollection', features: startFeatures } });
         map.addLayer({
           id: 'starts-circle',
@@ -257,7 +361,7 @@ const config = {
           const hike = cfg.hikes[idx];
           if (!hike) return;
           const dist = hike.distance_km != null ? ` · ${hike.distance_km} km` : '';
-          new maplibregl.Popup({ closeButton: false, offset: 10 })
+          new maplibregl.Popup({ closeButton: false, offset: 14 })
             .setLngLat(lngLat)
             .setHTML(
               `<a href="/hikes/${hike.slug}" style="text-decoration:none;color:inherit">` +
@@ -265,10 +369,25 @@ const config = {
             )
             .addTo(map);
         };
-        for (const layer of ['tracks-line', 'starts-circle']) {
+        // Overview: pins open popups; clusters zoom in. Per-hike: track/start.
+        const popupLayers = cfg.overview ? ['pins-unclustered'] : ['tracks-line', 'starts-circle'];
+        for (const layer of popupLayers) {
           map.on('click', layer, (e) => openPopup((e.features?.[0]?.properties?.idx as number) ?? 0, e.lngLat));
           map.on('mouseenter', layer, () => (map.getCanvas().style.cursor = 'pointer'));
           map.on('mouseleave', layer, () => (map.getCanvas().style.cursor = ''));
+        }
+        if (cfg.overview) {
+          map.on('click', 'pins-clusters', (e) => {
+            const f = e.features?.[0];
+            const clusterId = f?.properties?.cluster_id;
+            const src = map.getSource('pins') as maplibregl.GeoJSONSource;
+            if (clusterId == null || !src) return;
+            src.getClusterExpansionZoom(clusterId).then((zoom) => {
+              map.easeTo({ center: (f!.geometry as any).coordinates, zoom: zoom + 0.2 });
+            });
+          });
+          map.on('mouseenter', 'pins-clusters', () => (map.getCanvas().style.cursor = 'pointer'));
+          map.on('mouseleave', 'pins-clusters', () => (map.getCanvas().style.cursor = ''));
         }
       }
 
@@ -308,7 +427,11 @@ const config = {
 
     let interactionsReady = false;
     // style.load fires on first load and after every setStyle().
-    map.on('style.load', () => {
+    map.on('style.load', async () => {
+      if (cfg.overview) {
+        await pinReady;
+        if (!map.hasImage('hike-pin')) map.addImage('hike-pin', pinImg, { pixelRatio: 2 });
+      }
       addOverlayLayers();
       if (!interactionsReady) {
         interactionsReady = true;

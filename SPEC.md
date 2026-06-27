@@ -120,10 +120,14 @@ make the user notice the difference.
 ## 3. Pages & routes
 
 1. **`/` — Index / lifetime map (home).**
-   - A full-bleed MapLibre map showing **every published hike** as a track line, plus a start pin
-     per hike.
-   - Clicking a track or pin → popup card (title, date, distance, cover thumb) → links to the
-     hike page.
+   - An **overview-first "where I've been" map**: each hike is a custom cairn **pin** with a
+     place/date label, on a **pale** basemap so the pins are the visual subject; tracks render as
+     quiet faint lines underneath. Opens at an overview zoom with breathing room (not a tight
+     fit-to-bounds).
+   - **Clustering:** nearby hikes collapse into a single numbered pin until you zoom in (clicking a
+     cluster zooms to expand it). Pin labels use MapLibre collision detection — they show when
+     there's room, otherwise just the pin.
+   - Clicking a pin → popup card (title, date, distance) → links to the hike page.
    - Below or beside the map: a **logbook list** of all hikes (reverse-chronological) and the
      summary stats band (see §5).
    - A search box (Pagefind) filtering the logbook by title/notes/tags/location.
@@ -238,10 +242,12 @@ when many photos sit close together so the map doesn't choke.
   configured basemaps (topo / streets / satellite — all keyless). `setStyle` swaps the basemap;
   the track, start pins and photo markers are re-added on each style load. The choice is
   remembered for the session (sessionStorage).
-- **Index map:** load all hike tracks as **one GeoJSON FeatureCollection** into a single source,
-  rendered with a line layer. Start pins as one GeoJSON source + symbol/circle layer. Do **not**
-  create per-point or per-hike DOM markers — that won't scale and kills performance. Fit bounds
-  to all tracks on load.
+- **Index map (overview):** load all hike tracks as **one GeoJSON FeatureCollection** into a single
+  line source (rendered faint). Hike start points go into **one clustered GeoJSON source** rendered
+  by native symbol/circle layers: a custom cairn-pin icon + collision-aware place/date label for
+  individual hikes, numbered circles for clusters. Do **not** create per-point or per-hike DOM
+  markers. The basemap defaults to a pale vector style (keyless OpenFreeMap Positron, which ships
+  glyphs so map labels render); fit bounds with generous padding and a capped max-zoom.
 - **Per-hike map:** single track as a GeoJSON line; photo markers as a GeoJSON source with a
   symbol layer (thumbnail icons) OR a modest number of HTML markers if thumbnails are easier that
   way — but cap it and cluster.
