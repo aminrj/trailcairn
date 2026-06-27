@@ -38,6 +38,8 @@ interface Props {
   overview?: boolean;
   /** Initial basemap id (defaults to the per-hike topo). */
   defaultBasemap?: string;
+  /** Gentle fly-in to the bounds on load (the home hero moment). Reduced-motion aware. */
+  intro?: boolean;
   height?: string;
 }
 
@@ -51,6 +53,7 @@ const {
   reveal = false,
   overview = false,
   defaultBasemap = DEFAULT_BASEMAP_ID,
+  intro = false,
   height = '60vh',
 } = Astro.props;
 
@@ -64,6 +67,7 @@ const config = {
   photos,
   reveal,
   overview,
+  intro,
 };
 ---
 
@@ -166,6 +170,7 @@ const config = {
     photos: { lng: number; lat: number; thumb: string; full: string; caption?: string; index: number }[];
     reveal: boolean;
     overview: boolean;
+    intro: boolean;
   };
 
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -269,18 +274,30 @@ const config = {
       style: styleFor(initialId),
       attributionControl: { compact: true },
     };
-    if (cfg.bounds) {
+    // Hero moment: when `intro` is set (the home map), start wide and ease in to
+    // the pins on load — but only with motion allowed; otherwise fit instantly.
+    const introFly = cfg.intro && !!cfg.bounds && !prefersReducedMotion;
+    if (cfg.bounds && !introFly) {
       mapOptions.bounds = cfg.bounds;
       // Overview reads as "where I've wandered": breathing room, not a tight fit.
       mapOptions.fitBoundsOptions = cfg.overview
         ? { padding: 80, maxZoom: 8, animate: false }
         : { padding: 48, animate: false };
+    } else if (introFly && cfg.bounds) {
+      // Start at a wide, calm view centered on the bounds; fly in after load.
+      mapOptions.center = [(cfg.bounds[0][0] + cfg.bounds[1][0]) / 2, (cfg.bounds[0][1] + cfg.bounds[1][1]) / 2];
+      mapOptions.zoom = 3.4;
     } else {
       // No hikes yet: show an empty default view rather than nothing.
       mapOptions.center = [12, 55];
       mapOptions.zoom = 3;
     }
     const map = new maplibregl.Map(mapOptions);
+    if (introFly && cfg.bounds) {
+      map.once('load', () => {
+        map.fitBounds(cfg.bounds!, { padding: 80, maxZoom: 8, duration: 2300, essential: true });
+      });
+    }
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     if (cfg.basemaps.length > 1) {
       map.addControl(
