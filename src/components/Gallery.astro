@@ -3,8 +3,18 @@ import type { ProcessedPhoto } from '../lib/photos';
 
 interface Props {
   photos: ProcessedPhoto[];
+  /** Filename of the hero photo (the cover); defaults to the first photo. */
+  coverFilename?: string | null;
 }
-const { photos } = Astro.props;
+const { photos, coverFilename } = Astro.props;
+
+// Hero = the cover (or first); the rest flow in a varied masonry below it.
+const heroIndex = Math.max(
+  0,
+  coverFilename ? photos.findIndex((p) => p.filename === coverFilename) : 0,
+);
+const hero = photos[heroIndex];
+const rest = photos.map((p, i) => ({ p, i })).filter(({ i }) => i !== heroIndex);
 
 // Data the lightbox script needs (full image, caption, coords for map fly-to).
 const lightboxData = photos.map((p, i) => ({
@@ -21,26 +31,49 @@ const lightboxData = photos.map((p, i) => ({
   photos.length > 0 && (
     <section class="gallery" data-gallery>
       <script type="application/json" class="gallery-data" set:html={JSON.stringify(lightboxData)} />
-      <ul class="gallery-grid">
-        {photos.map((p, i) => (
-          <li>
-            <button class="gallery-item" data-index={i} aria-label={p.caption ?? `Photo ${i + 1}`}>
-              <img
-                src={p.derivatives.thumb}
-                srcset={`${p.derivatives.thumb} 320w, ${p.derivatives.medium} 1000w`}
-                sizes="(max-width: 600px) 45vw, 200px"
-                width={p.width}
-                height={p.height}
-                loading="lazy"
-                decoding="async"
-                alt={p.caption ?? ''}
-                style={`background-image:url(${p.blur});background-size:cover`}
-              />
-              {p.placed && <span class="pin-dot" title="Placed on the map" />}
-            </button>
-          </li>
-        ))}
-      </ul>
+
+      {hero && (
+        <figure class="gallery-hero">
+          <button class="gallery-item" data-index={heroIndex} aria-label={hero.caption ?? 'Cover photo'}>
+            <img
+              src={hero.derivatives.medium}
+              srcset={`${hero.derivatives.medium} 1000w, ${hero.derivatives.full} 1800w`}
+              sizes="(max-width: 760px) 100vw, 720px"
+              width={hero.width}
+              height={hero.height}
+              decoding="async"
+              alt={hero.caption ?? ''}
+              style={`background-image:url(${hero.blur});background-size:cover`}
+            />
+            {hero.placed && <span class="pin-dot" title="Placed on the map" />}
+          </button>
+          {hero.caption && <figcaption>{hero.caption}</figcaption>}
+        </figure>
+      )}
+
+      {rest.length > 0 && (
+        <div class="gallery-masonry">
+          {rest.map(({ p, i }) => (
+            <figure class="gallery-cell">
+              <button class="gallery-item" data-index={i} aria-label={p.caption ?? `Photo ${i + 1}`}>
+                <img
+                  src={p.derivatives.thumb}
+                  srcset={`${p.derivatives.thumb} 320w, ${p.derivatives.medium} 1000w`}
+                  sizes="(max-width: 600px) 45vw, 240px"
+                  width={p.width}
+                  height={p.height}
+                  loading="lazy"
+                  decoding="async"
+                  alt={p.caption ?? ''}
+                  style={`background-image:url(${p.blur});background-size:cover`}
+                />
+                {p.placed && <span class="pin-dot" title="Placed on the map" />}
+              </button>
+              {p.caption && <figcaption>{p.caption}</figcaption>}
+            </figure>
+          ))}
+        </div>
+      )}
 
       <div class="lightbox" data-lightbox hidden>
         <button class="lb-close" data-lb-close aria-label="Close">×</button>
@@ -54,14 +87,10 @@ const lightboxData = photos.map((p, i) => ({
 }
 
 <style>
-  .gallery-grid {
-    list-style: none;
-    padding: 0;
-    margin: 2rem 0 0;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 0.5rem;
+  .gallery {
+    margin-top: 2.5rem;
   }
+  /* Shared clickable photo button. */
   .gallery-item {
     position: relative;
     display: block;
@@ -70,19 +99,53 @@ const lightboxData = photos.map((p, i) => ({
     border: 0;
     background: none;
     cursor: pointer;
-    aspect-ratio: 4 / 3;
+    line-height: 0;
   }
   .gallery-item img {
     width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 6px;
+    height: auto;
     display: block;
+    border-radius: 8px;
+    background-color: #e7e3da;
   }
+  .gallery figure {
+    margin: 0;
+  }
+  .gallery figcaption {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.72rem;
+    color: var(--ink-soft, #5b5b54);
+    line-height: 1.4;
+    margin-top: 0.45rem;
+  }
+
+  /* Hero — the cover photo, wide and large. */
+  .gallery-hero {
+    margin-bottom: 0.7rem;
+  }
+  .gallery-hero .gallery-item img {
+    aspect-ratio: 3 / 2;
+    object-fit: cover;
+    border-radius: 10px;
+  }
+  .gallery-hero figcaption {
+    margin-top: 0.55rem;
+  }
+
+  /* The rest — a varied masonry (natural aspect ratios), not rigid squares. */
+  .gallery-masonry {
+    columns: 3 220px;
+    column-gap: 0.7rem;
+  }
+  .gallery-cell {
+    break-inside: avoid;
+    margin-bottom: 0.7rem;
+  }
+
   .pin-dot {
     position: absolute;
-    top: 6px;
-    right: 6px;
+    top: 8px;
+    right: 8px;
     width: 9px;
     height: 9px;
     border-radius: 50%;

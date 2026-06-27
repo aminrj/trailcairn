@@ -62,7 +62,7 @@ if (gpx?.stats.startEpochMs != null && gpx.stats.endEpochMs != null && gpx.stats
 
 // Photos: EXIF/timestamp placement + derivatives (slice 4). The hike's timezone
 // is shared so EXIF local-without-zone timestamps resolve to UTC consistently.
-const { photos } = await processHikePhotos(
+const { photos, cover } = await processHikePhotos(
   { slug: hike.id, dir: hikeDir(hike), cover: hike.data.cover, timezone: tz.id },
   gpx,
 );
@@ -133,7 +133,7 @@ const mapPhotos: MapPhoto[] = photos
       <Content />
     </div>
 
-    <Gallery photos={photos} />
+    <Gallery photos={photos} coverFilename={cover?.filename} />
     {
       photos.some((p) => !p.placed) && (
         <p class="meta unplaced-note">
