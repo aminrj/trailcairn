@@ -1,6 +1,6 @@
 ---
 import type { Feature, LineString } from 'geojson';
-import { MAP_STYLE_URL } from '../lib/map';
+import { DEFAULT_BASEMAP_STYLE } from '../lib/map';
 
 export interface MapPhoto {
   lng: number;
@@ -48,7 +48,7 @@ const {
   height = '60vh',
 } = Astro.props;
 
-const config = { styleUrl: MAP_STYLE_URL, lines, starts, bounds, hikes, photos, reveal };
+const config = { style: DEFAULT_BASEMAP_STYLE, lines, starts, bounds, hikes, photos, reveal };
 ---
 
 <div class="maplibre-map" id={id} data-map style={`--map-height:${height}`}>
@@ -94,7 +94,7 @@ const config = { styleUrl: MAP_STYLE_URL, lines, starts, bounds, hikes, photos, 
   import 'maplibre-gl/dist/maplibre-gl.css';
 
   type Cfg = {
-    styleUrl: string;
+    style: string | maplibregl.StyleSpecification;
     lines: GeoJSON.Feature<GeoJSON.LineString>[];
     starts: ([number, number] | null)[];
     bounds: [[number, number], [number, number]];
@@ -114,7 +114,7 @@ const config = { styleUrl: MAP_STYLE_URL, lines, starts, bounds, hikes, photos, 
 
     const map = new maplibregl.Map({
       container: el,
-      style: cfg.styleUrl,
+      style: cfg.style,
       bounds: cfg.bounds,
       fitBoundsOptions: { padding: 48, animate: false },
       attributionControl: { compact: true },

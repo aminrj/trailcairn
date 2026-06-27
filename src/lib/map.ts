@@ -1,5 +1,73 @@
-// Single config point for the basemap (SPEC §1/§7). Read at build time from
-// MAP_STYLE_URL so a self-hosted vector style can be swapped in without code
-// changes. Falls back to the free MapLibre demo style (no API key needed).
-export const MAP_STYLE_URL =
-  process.env.MAP_STYLE_URL ?? 'https://demotiles.maplibre.org/style.json';
+import type { StyleSpecification } from 'maplibre-gl';
+
+// Basemap styles for MapLibre. Each is either a style-URL string or an inline
+// MapLibre style object (for keyless raster providers). This is the single
+// place to add/remove basemaps — components read from BASEMAPS and don't
+// hardcode any provider (SPEC §1/§7).
+
+const OSM = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+
+function rasterStyle(opts: {
+  tiles: string[];
+  attribution: string;
+  maxzoom?: number;
+  tileSize?: number;
+}): StyleSpecification {
+  return {
+    version: 8,
+    sources: {
+      basemap: {
+        type: 'raster',
+        tiles: opts.tiles,
+        tileSize: opts.tileSize ?? 256,
+        maxzoom: opts.maxzoom ?? 19,
+        attribution: opts.attribution,
+      },
+    },
+    layers: [{ id: 'basemap', type: 'raster', source: 'basemap' }],
+  };
+}
+
+// Outdoor/topographic: hillshading, contours and OSM hiking trails. Keyless.
+const TOPO_STYLE = rasterStyle({
+  tiles: [
+    'https://a.tile.opentopomap.org/{z}/{x}/{y}.png',
+    'https://b.tile.opentopomap.org/{z}/{x}/{y}.png',
+    'https://c.tile.opentopomap.org/{z}/{x}/{y}.png',
+  ],
+  attribution: `Map data: ${OSM}, SRTM | Map style: © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)`,
+  maxzoom: 17,
+});
+
+// Satellite imagery. Keyless (Esri public service).
+const SATELLITE_STYLE = rasterStyle({
+  tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+  attribution:
+    'Imagery © <a href="https://www.esri.com">Esri</a>, Maxar, Earthstar Geographics, and the GIS User Community',
+  maxzoom: 19,
+});
+
+export interface Basemap {
+  id: string;
+  label: string;
+  /** A style-URL string or an inline MapLibre style object. */
+  style: string | StyleSpecification;
+  /** Disabled basemaps (e.g. needing a key) are wired but hidden by default. */
+  enabled?: boolean;
+}
+
+// MAP_STYLE_URL overrides the default (topo) basemap's style, keeping the
+// single env config point from SPEC §1/§7 (e.g. swap in a self-hosted style).
+const TOPO_OVERRIDE = process.env.MAP_STYLE_URL;
+
+export const BASEMAPS: Basemap[] = [
+  { id: 'topo', label: 'Topo', style: TOPO_OVERRIDE ?? TOPO_STYLE, enabled: true },
+  { id: 'streets', label: 'Streets', style: 'https://tiles.openfreemap.org/styles/liberty', enabled: true },
+  { id: 'satellite', label: 'Satellite', style: SATELLITE_STYLE, enabled: true },
+];
+
+export const ENABLED_BASEMAPS = BASEMAPS.filter((b) => b.enabled !== false);
+
+/** Default basemap shown on first load. */
+export const DEFAULT_BASEMAP_ID = ENABLED_BASEMAPS[0]?.id ?? 'topo';
+export const DEFAULT_BASEMAP_STYLE = ENABLED_BASEMAPS[0]?.style;
