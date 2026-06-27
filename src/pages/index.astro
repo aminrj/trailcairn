@@ -4,10 +4,18 @@ import Map from '../components/Map.astro';
 import LifetimeBand from '../components/LifetimeBand.astro';
 import HikeSearch from '../components/HikeSearch.astro';
 import { SITE_TAGLINE } from '../consts';
-import { getVisibleHikes, getIndexMapData } from '../lib/hikes';
+import { getVisibleHikes, getIndexMapData, hikeDir } from '../lib/hikes';
+import { getHikeCover, type HikeCover } from '../lib/photos';
 
 const hikes = await getVisibleHikes();
 const mapData = await getIndexMapData();
+
+// Cover thumbnail per hike for the logbook (only the cover is processed, not
+// every photo — see getHikeCover). Plain object: `Map` here is the component.
+const covers: Record<string, HikeCover | null> = {};
+for (const hike of hikes) {
+  covers[hike.id] = await getHikeCover({ slug: hike.id, dir: hikeDir(hike), cover: hike.data.cover });
+}
 
 const dateFmt = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
 
@@ -52,18 +60,39 @@ const searchText = (h: (typeof hikes)[number]) =>
     ) : (
       <>
         <ul class="hike-list">
-          {hikes.map((hike) => (
-            <li class="hike-card" data-slug={hike.id} data-search={searchText(hike)}>
-              <h2>
-                <a href={`/hikes/${hike.id}`}>{hike.data.title}</a>{' '}
-                {hike.data.status === 'draft' && <span class="draft-badge">draft</span>}
-              </h2>
-              <p class="meta">
-                {dateFmt.format(hike.data.date)} · {hike.data.location}
-              </p>
-              <p>{hike.data.summary}</p>
-            </li>
-          ))}
+          {hikes.map((hike) => {
+            const cover = covers[hike.id];
+            return (
+              <li class="hike-card" data-slug={hike.id} data-search={searchText(hike)}>
+                <a class="hike-card-link" href={`/hikes/${hike.id}`}>
+                  {cover ? (
+                    <img
+                      class="hike-card-thumb"
+                      src={cover.thumb}
+                      width={cover.width}
+                      height={cover.height}
+                      loading="lazy"
+                      decoding="async"
+                      alt=""
+                      style={`background-image:url(${cover.blur});background-size:cover`}
+                    />
+                  ) : (
+                    <span class="hike-card-thumb hike-card-thumb--empty" aria-hidden="true" />
+                  )}
+                  <span class="hike-card-body">
+                    <span class="hike-card-title">
+                      {hike.data.title}
+                      {hike.data.status === 'draft' && <span class="draft-badge">draft</span>}
+                    </span>
+                    <span class="meta hike-card-meta">
+                      {dateFmt.format(hike.data.date)} · {hike.data.location}
+                    </span>
+                    <span class="hike-card-summary">{hike.data.summary}</span>
+                  </span>
+                </a>
+              </li>
+            );
+          })}
         </ul>
         <p class="placeholder-note" data-no-matches hidden>
           No hikes match your search — clear it to see them all on the map again.

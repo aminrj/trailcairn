@@ -109,53 +109,85 @@ a {
   padding: 2rem 0;
 }
 
-/* Home hero (index): title + lifetime stats + overview map as one unit. */
+/* Home hero (index): title → subtitle → stats → map, given room to breathe. */
 .home-hero {
-  margin: 2.5rem 0 0;
+  margin: 4rem 0 0;
 }
 .home-hero h1 {
-  font-size: clamp(2rem, 5vw, 3rem);
-  margin: 0 0 0.4rem;
+  font-size: clamp(2.2rem, 5.5vw, 3.25rem);
+  margin: 0 0 0.9rem;
 }
 .home-sub {
   margin: 0;
   max-width: 52ch;
+  font-size: 1.05rem;
   color: var(--ink-soft);
 }
 
-/* Hike logbook (index): a quiet, uniform list — rows, not boxes. */
+/* Hike logbook (index): a quiet, uniform list with a warm cover thumbnail. */
 .hike-list {
   list-style: none;
   padding: 0;
-  margin: 2.5rem 0 0;
+  margin: 3rem 0 0;
 }
 .hike-card {
-  padding: 1.05rem 0;
   border-top: 1px solid var(--line);
 }
 .hike-list .hike-card:last-child {
   border-bottom: 1px solid var(--line);
 }
-.hike-card h2 {
-  margin: 0 0 0.15rem;
-  font-size: 1.15rem;
-  font-weight: 600;
-}
-.hike-card h2 a {
-  color: var(--ink);
+.hike-card-link {
+  display: flex;
+  gap: 1.1rem;
+  align-items: center;
+  padding: 1.1rem 0.25rem;
   text-decoration: none;
-  transition: color 0.15s ease;
+  color: inherit;
+  border-radius: 8px;
+  transition: background-color 0.15s ease;
 }
-.hike-card h2 a:hover {
+.hike-card-link:hover {
+  background: rgba(63, 107, 77, 0.05);
+}
+.hike-card-thumb {
+  flex: none;
+  width: 84px;
+  height: 84px;
+  object-fit: cover;
+  border-radius: 8px;
+  background-color: #e7e3da;
+  border: 1px solid var(--line);
+}
+.hike-card-thumb--empty {
+  display: block;
+}
+.hike-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  min-width: 0;
+}
+.hike-card-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.2rem;
+  line-height: 1.2;
+  color: var(--ink);
+}
+.hike-card-link:hover .hike-card-title {
   color: var(--accent);
 }
-.hike-card p {
-  margin: 0.3rem 0 0;
+.hike-card-meta {
+  margin: 0;
+}
+.hike-card-summary {
   color: var(--ink-soft);
   font-size: 0.95rem;
-}
-.hike-card p.meta {
-  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 .draft-badge {
   font-family: var(--font-mono);
@@ -166,6 +198,7 @@ a {
   background: #fdf3d8;
   border-radius: 4px;
   padding: 0.1rem 0.4rem;
+  margin-left: 0.45rem;
   vertical-align: middle;
 }
 

@@ -299,6 +299,100 @@ export function matchPhotoToTrack(epochMs: number, gpx: GpxData) {
 
 export const MAX_MATCH_GAP_MINUTES = MAX_MATCH_GAP_MIN;
 
+interface PhotoImage {
+  width: number;
+  height: number;
+  blur: string;
+  derivatives: Record<SizeName, string>;
+  coldDecode: boolean;
+  cacheChanged: boolean;
+}
+
+/**
+ * Ensure one photo's WebP derivatives + blur exist (cached by source mtime),
+ * decoding the original (HEIC→JPEG when needed) only on a cold miss. Mutates
+ * `cache`. Shared by the full per-hike pipeline and the cover-only path.
+ */
+async function ensurePhotoImage(
+  slug: string,
+  photosDir: string,
+  filename: string,
+  cache: ImageCache,
+): Promise<PhotoImage> {
+  const absPath = path.join(photosDir, filename);
+  const srcMtimeMs = fs.statSync(absPath).mtimeMs;
+  const base = path.parse(filename).name;
+  let width: number;
+  let height: number;
+  let blur: string;
+  let coldDecode = false;
+  let cacheChanged = false;
+
+  const cached = cache[filename];
+  if (cached && cached.mtimeMs === srcMtimeMs && derivativesFresh(slug, base, srcMtimeMs)) {
+    ({ width, height, blur } = cached);
+  } else if (derivativesFresh(slug, base, srcMtimeMs)) {
+    // Derivatives current but cache entry missing/stale → rebuild cheaply from
+    // the existing WebP rather than re-decoding a HEIC original.
+    const fullPath = path.join(GEN_ROOT, slug, `${base}-full.webp`);
+    const meta = await sharp(fullPath).metadata();
+    width = meta.width ?? 0;
+    height = meta.height ?? 0;
+    const blurBuf = await sharp(fullPath).resize({ width: 16 }).webp({ quality: 40 }).toBuffer();
+    blur = `data:image/webp;base64,${blurBuf.toString('base64')}`;
+    cache[filename] = { mtimeMs: srcMtimeMs, width, height, blur };
+    cacheChanged = true;
+  } else {
+    coldDecode = true;
+    const decoded = await decodeToBuffer(absPath);
+    const meta = await sharp(decoded).rotate().metadata();
+    width = meta.width ?? 0;
+    height = meta.height ?? 0;
+    await Promise.all([
+      ensureDerivative(decoded, slug, base, 'thumb', srcMtimeMs),
+      ensureDerivative(decoded, slug, base, 'medium', srcMtimeMs),
+      ensureDerivative(decoded, slug, base, 'full', srcMtimeMs),
+    ]);
+    const blurBuf = await sharp(decoded).rotate().resize({ width: 16 }).webp({ quality: 40 }).toBuffer();
+    blur = `data:image/webp;base64,${blurBuf.toString('base64')}`;
+    cache[filename] = { mtimeMs: srcMtimeMs, width, height, blur };
+    cacheChanged = true;
+  }
+  return { width, height, blur, derivatives: derivativeUrls(slug, base), coldDecode, cacheChanged };
+}
+
+export interface HikeCover {
+  thumb: string;
+  medium: string;
+  blur: string;
+  width: number;
+  height: number;
+}
+
+/**
+ * Resolve and process ONLY a hike's cover photo (frontmatter `cover`, else the
+ * first photo) for the index logbook thumbnails — so the index doesn't decode
+ * every photo of every hike. Returns null when the hike has no photos.
+ */
+export async function getHikeCover(input: HikePhotoInput): Promise<HikeCover | null> {
+  const photosDir = path.join(input.dir, 'photos');
+  const files = listPhotoFiles(photosDir);
+  if (files.length === 0) return null;
+  let coverFile = files[0];
+  if (input.cover) {
+    const name = path.basename(input.cover);
+    if (files.includes(name)) coverFile = name;
+  }
+  const cache = readImageCache(input.slug);
+  try {
+    const img = await ensurePhotoImage(input.slug, photosDir, coverFile, cache);
+    if (img.cacheChanged) writeImageCache(input.slug, cache);
+    return { thumb: img.derivatives.thumb, medium: img.derivatives.medium, blur: img.blur, width: img.width, height: img.height };
+  } catch {
+    return null;
+  }
+}
+
 // --- main -------------------------------------------------------------------
 
 /**
@@ -325,49 +419,12 @@ export async function processHikePhotos(
     const absPath = path.join(photosDir, filename);
     const ov = overrides[filename] ?? {};
     try {
-      const srcMtimeMs = fs.statSync(absPath).mtimeMs;
-      const base = path.parse(filename).name;
-
-      // Reuse cached image work when the source is unchanged and derivatives
-      // still exist on disk — this avoids re-decoding HEIC on every request.
-      let width: number;
-      let height: number;
-      let blur: string;
-      const cached = cache[filename];
-      if (cached && cached.mtimeMs === srcMtimeMs && derivativesFresh(slug, base, srcMtimeMs)) {
-        // Fast path: nothing changed.
-        ({ width, height, blur } = cached);
-      } else if (derivativesFresh(slug, base, srcMtimeMs)) {
-        // Derivatives exist and are current but the cache entry is missing/stale
-        // (e.g. cache cleared, fresh checkout). Rebuild it from the existing
-        // WebP — far cheaper than re-decoding a HEIC original.
-        const fullPath = path.join(GEN_ROOT, slug, `${base}-full.webp`);
-        const meta = await sharp(fullPath).metadata(); // aspect ratio matches original
-        width = meta.width ?? 0;
-        height = meta.height ?? 0;
-        const blurBuf = await sharp(fullPath).resize({ width: 16 }).webp({ quality: 40 }).toBuffer();
-        blur = `data:image/webp;base64,${blurBuf.toString('base64')}`;
-        cache[filename] = { mtimeMs: srcMtimeMs, width, height, blur };
-        cacheDirty = true;
-      } else {
-        // Cold path: decode the original (HEIC → JPEG when needed) and generate
-        // all derivatives. The expensive case — cached thereafter.
-        coldDecodes++;
-        const decoded = await decodeToBuffer(absPath);
-        const meta = await sharp(decoded).rotate().metadata();
-        width = meta.width ?? 0;
-        height = meta.height ?? 0;
-        await Promise.all([
-          ensureDerivative(decoded, slug, base, 'thumb', srcMtimeMs),
-          ensureDerivative(decoded, slug, base, 'medium', srcMtimeMs),
-          ensureDerivative(decoded, slug, base, 'full', srcMtimeMs),
-        ]);
-        const blurBuf = await sharp(decoded).rotate().resize({ width: 16 }).webp({ quality: 40 }).toBuffer();
-        blur = `data:image/webp;base64,${blurBuf.toString('base64')}`;
-        cache[filename] = { mtimeMs: srcMtimeMs, width, height, blur };
-        cacheDirty = true;
-      }
-      const { thumb, medium, full } = derivativeUrls(slug, base);
+      // Generate/reuse derivatives + blur (decodes HEIC only on a cold miss).
+      const img = await ensurePhotoImage(slug, photosDir, filename, cache);
+      const { width, height, blur } = img;
+      const { thumb, medium, full } = img.derivatives;
+      if (img.coldDecode) coldDecodes++;
+      if (img.cacheChanged) cacheDirty = true;
 
       // EXIF read from the ORIGINAL bytes (works for HEIC + JPEG). Cheap, so it
       // runs every time — placement can depend on _photos.json / GPX changes.
