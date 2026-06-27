@@ -1,0 +1,72 @@
+---
+// The route-line signature as inline SVG. Reused on hike cards and the hero.
+import { routeMotif } from '../lib/route';
+
+interface Props {
+  lines: [number, number][][];
+  width?: number;
+  height?: number;
+  stroke?: string;
+  strokeWidth?: number;
+  class?: string;
+  /** Animate a one-time line-draw when scrolled into view (reduced-motion aware). */
+  draw?: boolean;
+}
+const {
+  lines,
+  width = 120,
+  height = 80,
+  stroke = 'var(--accent, #3f6b4d)',
+  strokeWidth = 2,
+  class: className,
+  draw = false,
+} = Astro.props;
+
+const motif = routeMotif(lines, { width, height, padding: strokeWidth * 2 + 2 });
+---
+
+{
+  motif.paths.length > 0 && (
+    <svg
+      class:list={['route-motif', className, { 'route-motif--draw': draw }]}
+      viewBox={`0 0 ${motif.width} ${motif.height}`}
+      width={motif.width}
+      height={motif.height}
+      fill="none"
+      aria-hidden="true"
+    >
+      {motif.paths.map((d) => (
+        <path
+          d={d}
+          pathLength="1"
+          stroke={stroke}
+          stroke-width={strokeWidth}
+          stroke-linejoin="round"
+          stroke-linecap="round"
+        />
+      ))}
+    </svg>
+  )
+}
+
+<style>
+  .route-motif {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+  /* One-time draw-on-reveal; gated behind reduced-motion. */
+  @media (prefers-reduced-motion: no-preference) {
+    .route-motif--draw path {
+      stroke-dasharray: 1;
+      stroke-dashoffset: 1;
+      animation: route-draw 1.4s ease-out forwards;
+    }
+  }
+  @keyframes route-draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+</style>

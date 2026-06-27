@@ -164,6 +164,17 @@ make the user notice the difference.
 4. **(Future seam, do not build) `/tags/[tag]`** — leave the data shape ready but don't build
    tag-filter pages in v1 unless trivial.
 
+**Social preview (Open Graph) cards (added feature):** every page carries OG/Twitter meta
+(`og:image`, `twitter:card = summary_large_image`, etc.) pointing at a **per-page card image
+generated at build time**, so shared links render a rich preview. Cards are 1200×630 PNGs emitted
+by static endpoints (`/og/home.png`, `/og/<slug>.png`) — no runtime/SSR. Each card is hand-built as
+SVG (paper background, Fraunces title, JetBrains Mono stats) and rasterised with **resvg**
+(`@resvg/resvg-js`) using committed brand-font TTFs (`src/assets/fonts/`). The home card shows the
+wordmark, tagline, lifetime stats and a dot-constellation of where I've been; each hike card shows
+the title, date/location, key stats, and the **route-line motif** (the GPX trace as a signature,
+shared with the index cards and hero — see §7). Per-hike cards follow the draft rule (only
+published hikes emit one). Absolute URLs require `site` in `astro.config.mjs`.
+
 ---
 
 ## 4. The authoring / feedback loop (highest priority to get right)

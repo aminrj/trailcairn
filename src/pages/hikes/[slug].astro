@@ -79,7 +79,7 @@ const mapPhotos: MapPhoto[] = photos
   }));
 ---
 
-<BaseLayout title={hike.data.title} description={hike.data.summary}>
+<BaseLayout title={hike.data.title} description={hike.data.summary} ogImage={`/og/${hike.id}.png`}>
   <article data-pagefind-body>
     <header class="hike-header">
       <h1>{hike.data.title}</h1>

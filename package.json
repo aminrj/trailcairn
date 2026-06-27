@@ -12,6 +12,7 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@tmcw/togeojson": "^7.1.2",
     "@xmldom/xmldom": "^0.9.10",
     "astro": "^5.0.0",
