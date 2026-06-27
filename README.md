@@ -102,13 +102,24 @@ include their own offset, which is used automatically. When a photo lacks one, t
 every timestamp-placed photo along the track — `npm run validate` warns when photo and track times
 drift far apart.
 
+## Maps
+
+Each map defaults to a keyless outdoor/topographic basemap (OpenTopoMap — hillshading, contours,
+trails) and has a small switcher to toggle **Topo / Streets / Satellite** at runtime (all keyless;
+the choice is remembered for the session). Basemaps are defined in one list in
+[`src/lib/map.ts`](./src/lib/map.ts) — add or remove options there. `MAP_STYLE_URL` overrides the
+default topo style.
+
+Per-hike pages also have a **replay player**: press play to send a marker along the track over the
+recorded timeline, with the elevation cursor in sync, a scrubber, speed (1×/4×/16×), and a follow
+toggle.
+
 ## Configuration
 
-Copy `.env.example` to `.env`. Two settings, both optional:
+Copy `.env.example` to `.env`. Both settings optional:
 
-- `MAP_STYLE_URL` — the basemap style for MapLibre. The single config point for the map; swap in a
-  self-hosted or topo style without touching code. Defaults to the free MapLibre demo style (no API
-  key needed).
+- `MAP_STYLE_URL` — overrides the default topo basemap (single config point); swap in a self-hosted
+  style without touching code.
 - `PHOTO_UTC_OFFSET_HOURS` — fallback timezone offset for photo placement (see above).
 
 ## Deploy (Cloudflare Pages)

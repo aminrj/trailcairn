@@ -6,8 +6,9 @@ import type { MapPhoto } from '../../components/Map.astro';
 import StatsBand from '../../components/StatsBand.astro';
 import ElevationProfile from '../../components/ElevationProfile.astro';
 import Gallery from '../../components/Gallery.astro';
+import Replay from '../../components/Replay.astro';
 import { getVisibleHikes, hikeDir, loadGpx, resolveStats } from '../../lib/hikes';
-import { GpxError } from '../../lib/gpx';
+import { GpxError, normalizedTimeline } from '../../lib/gpx';
 import { processHikePhotos } from '../../lib/photos';
 
 export async function getStaticPaths() {
@@ -91,6 +92,19 @@ const mapPhotos: MapPhoto[] = photos
     />
 
     {gpx && <ElevationProfile elevations={gpx.elevations} cumulativeKm={gpx.cumulativeKm} />}
+
+    {
+      gpx && gpx.coordinates.length > 1 && (
+        <Replay
+          mapId={`map-${hike.id}`}
+          coordinates={gpx.coordinates}
+          timeline={normalizedTimeline(gpx)}
+          cumulativeKm={gpx.cumulativeKm}
+          totalKm={gpx.cumulativeKm[gpx.cumulativeKm.length - 1]}
+          durationSeconds={gpx.stats.durationSeconds}
+        />
+      )
+    }
 
     <div class="prose hike-body">
       <Content />

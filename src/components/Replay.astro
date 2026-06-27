@@ -1,0 +1,309 @@
+---
+// "Replay the hike" player (SPEC §3.2). A self-contained island that animates a
+// marker along the precomputed track over the GPX timeline, moves the elevation
+// cursor in sync, and optionally pans the map to follow. No raw GPX reaches the
+// client — it reuses the precomputed coordinates/timeline arrays.
+interface Props {
+  mapId: string;
+  coordinates: [number, number][];
+  timeline: number[]; // normalized 0..1 per point
+  cumulativeKm: number[];
+  totalKm: number;
+  durationSeconds: number | null;
+}
+const { mapId, coordinates, timeline, cumulativeKm, totalKm, durationSeconds } = Astro.props;
+const config = { mapId, coordinates, timeline, cumulativeKm, totalKm, durationSeconds };
+---
+
+<section class="replay" data-replay aria-label="Replay this hike">
+  <script type="application/json" class="replay-config" set:html={JSON.stringify(config)} />
+  <div class="replay-bar">
+    <button type="button" class="replay-toggle" data-replay-toggle aria-label="Play replay">▶</button>
+    <input
+      type="range"
+      class="replay-scrub"
+      min="0"
+      max="1000"
+      value="0"
+      step="1"
+      data-replay-scrub
+      aria-label="Scrub through the hike"
+    />
+    <div class="replay-speeds" role="group" aria-label="Playback speed">
+      <button type="button" data-speed="1" aria-pressed="true">1×</button>
+      <button type="button" data-speed="4" aria-pressed="false">4×</button>
+      <button type="button" data-speed="16" aria-pressed="false">16×</button>
+    </div>
+    <label class="replay-follow">
+      <input type="checkbox" data-replay-follow checked /> Follow
+    </label>
+    <span class="replay-readout meta" data-replay-readout>0.0 / {totalKm.toFixed(1)} km</span>
+  </div>
+</section>
+
+<style>
+  .replay-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin: 0.75rem 0 0;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--line, #e4e0d8);
+    border-radius: 8px;
+    background: #fff;
+  }
+  .replay-toggle {
+    flex: none;
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 50%;
+    border: 1px solid var(--line, #e4e0d8);
+    background: var(--accent, #3f6b4d);
+    color: #fff;
+    font-size: 0.9rem;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .replay-scrub {
+    flex: 1 1 160px;
+    accent-color: var(--accent, #3f6b4d);
+  }
+  .replay-speeds {
+    display: flex;
+    gap: 2px;
+  }
+  .replay-speeds button {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.72rem;
+    border: 1px solid var(--line, #e4e0d8);
+    background: #fff;
+    color: #444;
+    padding: 0.2rem 0.45rem;
+    cursor: pointer;
+  }
+  .replay-speeds button:first-child {
+    border-radius: 4px 0 0 4px;
+  }
+  .replay-speeds button:last-child {
+    border-radius: 0 4px 4px 0;
+  }
+  .replay-speeds button[aria-pressed='true'] {
+    background: var(--accent, #3f6b4d);
+    color: #fff;
+    border-color: var(--accent, #3f6b4d);
+  }
+  .replay-follow {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.72rem;
+    color: var(--ink-soft, #5b5b54);
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  .replay-readout {
+    margin-left: auto;
+  }
+
+  /* Marker that travels the track (appended into the map container). */
+  :global(.replay-marker) {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+    border-radius: 50%;
+    background: #c0392b;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 2px rgba(192, 57, 43, 0.4);
+    pointer-events: none;
+    will-change: transform;
+    z-index: 3;
+    display: none;
+  }
+  :global(.replay-marker.is-active) {
+    display: block;
+  }
+  /* Vertical cursor over the elevation profile. */
+  :global(.elevation) {
+    position: relative;
+  }
+  :global(.replay-cursor) {
+    position: absolute;
+    top: 0;
+    bottom: 1.4rem;
+    width: 2px;
+    background: rgba(192, 57, 43, 0.8);
+    pointer-events: none;
+    display: none;
+  }
+  :global(.replay-cursor.is-active) {
+    display: block;
+  }
+</style>
+
+<script>
+  type Cfg = {
+    mapId: string;
+    coordinates: [number, number][];
+    timeline: number[];
+    cumulativeKm: number[];
+    totalKm: number;
+    durationSeconds: number | null;
+  };
+
+  // Whole track plays in this long at 1×; speed multipliers divide it.
+  const BASE_MS = 45000;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function initReplay(root: HTMLElement) {
+    if (root.dataset.replayReady) return;
+    root.dataset.replayReady = 'true';
+    const cfgEl = root.querySelector('.replay-config');
+    if (!cfgEl?.textContent) return;
+    const cfg: Cfg = JSON.parse(cfgEl.textContent);
+    const mapEl = document.getElementById(cfg.mapId) as (HTMLElement & { __map?: any }) | null;
+    if (!mapEl) return;
+
+    let tries = 0;
+    const waitForMap = () => {
+      const map = mapEl.__map;
+      if (map) {
+        if (map.isStyleLoaded && map.isStyleLoaded()) setup(map);
+        else map.once('load', () => setup(map));
+      } else if (tries++ < 100) {
+        setTimeout(waitForMap, 100);
+      }
+    };
+    waitForMap();
+
+    function setup(map: any) {
+      const { coordinates, timeline, cumulativeKm, totalKm } = cfg;
+      const lastIdx = coordinates.length - 1;
+
+      const marker = document.createElement('div');
+      marker.className = 'replay-marker';
+      mapEl!.appendChild(marker);
+
+      const profile = document.querySelector<HTMLElement>('.elevation');
+      let cursor: HTMLElement | null = null;
+      if (profile) {
+        cursor = document.createElement('div');
+        cursor.className = 'replay-cursor';
+        profile.appendChild(cursor);
+      }
+
+      const toggleBtn = root.querySelector<HTMLButtonElement>('[data-replay-toggle]')!;
+      const scrub = root.querySelector<HTMLInputElement>('[data-replay-scrub]')!;
+      const followInput = root.querySelector<HTMLInputElement>('[data-replay-follow]')!;
+      const readout = root.querySelector<HTMLElement>('[data-replay-readout]')!;
+      const speedBtns = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-speed]'));
+
+      if (reducedMotion) followInput.checked = false; // motion only on explicit play
+
+      let progress = 0; // 0..1 of playback
+      let playing = false;
+      let speed = 1;
+      let raf = 0;
+      let lastTs = 0;
+      let hint = 0;
+
+      function locate(p: number) {
+        let i = hint;
+        if (timeline[i] > p) i = 0;
+        while (i < lastIdx && timeline[i + 1] < p) i++;
+        hint = i;
+        const a = timeline[i];
+        const b = timeline[i + 1] ?? 1;
+        const frac = b > a ? (p - a) / (b - a) : 0;
+        const j = Math.min(i + 1, lastIdx);
+        const [lng1, lat1] = coordinates[i];
+        const [lng2, lat2] = coordinates[j];
+        return {
+          lng: lng1 + (lng2 - lng1) * frac,
+          lat: lat1 + (lat2 - lat1) * frac,
+          km: cumulativeKm[i] + (cumulativeKm[j] - cumulativeKm[i]) * frac,
+        };
+      }
+
+      function render(p: number, fromScrub = false) {
+        marker.classList.add('is-active');
+        const { lng, lat, km } = locate(p);
+        const px = map.project([lng, lat]);
+        marker.style.transform = `translate(${px.x}px, ${px.y}px)`;
+        if (cursor) {
+          cursor.classList.add('is-active');
+          cursor.style.left = `${totalKm > 0 ? (km / totalKm) * 100 : 0}%`;
+        }
+        readout.textContent = `${km.toFixed(1)} / ${totalKm.toFixed(1)} km`;
+        if (!fromScrub) scrub.value = String(Math.round(p * 1000));
+      }
+
+      function follow(p: number) {
+        if (!followInput.checked) return;
+        const { lng, lat } = locate(p);
+        if (reducedMotion) map.jumpTo({ center: [lng, lat] });
+        else map.setCenter([lng, lat]);
+      }
+
+      function frame(ts: number) {
+        if (!playing) return;
+        if (lastTs) progress += (ts - lastTs) / (BASE_MS / speed);
+        lastTs = ts;
+        if (progress >= 1) {
+          progress = 1;
+          render(progress);
+          follow(progress);
+          pause();
+          return;
+        }
+        render(progress);
+        follow(progress);
+        raf = requestAnimationFrame(frame);
+      }
+
+      function play() {
+        if (playing) return;
+        if (progress >= 1) progress = 0; // replay from start
+        playing = true;
+        lastTs = 0;
+        toggleBtn.textContent = '⏸';
+        toggleBtn.setAttribute('aria-label', 'Pause replay');
+        raf = requestAnimationFrame(frame);
+      }
+      function pause() {
+        playing = false;
+        cancelAnimationFrame(raf);
+        toggleBtn.textContent = '▶';
+        toggleBtn.setAttribute('aria-label', 'Play replay');
+      }
+
+      toggleBtn.addEventListener('click', () => (playing ? pause() : play()));
+      scrub.addEventListener('input', () => {
+        pause();
+        progress = Number(scrub.value) / 1000;
+        render(progress, true);
+      });
+      for (const btn of speedBtns) {
+        btn.addEventListener('click', () => {
+          speed = Number(btn.dataset.speed);
+          speedBtns.forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+        });
+      }
+      followInput.addEventListener('change', () => {
+        if (followInput.checked) follow(progress);
+      });
+      // Keep the marker pinned when the user pans/zooms while paused.
+      map.on('move', () => {
+        if (!playing) render(progress);
+      });
+
+      render(0); // show the start marker immediately
+    }
+  }
+
+  const init = () => document.querySelectorAll<HTMLElement>('[data-replay]').forEach(initReplay);
+  if (document.readyState !== 'loading') init();
+  else document.addEventListener('DOMContentLoaded', init);
+</script>

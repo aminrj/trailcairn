@@ -137,6 +137,12 @@ make the user notice the difference.
      static SVG/canvas profile is fine for v1. Hover-to-locate-on-map is a nice-to-have, not
      required for v1.
    - Stats band (distance, ascent, descent, duration, date, location).
+   - **Replay player** (added feature): a play/pause control animates a marker travelling the
+     track over the GPX timeline (real per-point times where present, even spacing otherwise),
+     with the elevation cursor moving in sync, a scrubber, speed control (1×/4×/16×), and an
+     optional "follow" toggle that pans the map. Self-contained island; reuses the precomputed
+     coordinates/timeline (no raw GPX shipped); reduced-motion-aware (no autoplay, motion only on
+     explicit play). See §7.
    - The Markdown diary entry.
    - A photo gallery / lightbox; clicking a photo can pan the map to its marker (nice-to-have).
 
@@ -225,7 +231,13 @@ when many photos sit close together so the map doesn't choke.
 
 ## 7. Map implementation details
 
-- Use **MapLibre GL JS**. Style URL from `MAP_STYLE_URL` (single config point).
+- Use **MapLibre GL JS**. The default basemap is a keyless outdoor/topographic style
+  (OpenTopoMap — hillshading, contours, OSM trails); `MAP_STYLE_URL` still overrides it (single
+  config point). Basemaps are defined as one config list in `lib/map.ts`.
+- **Basemap switcher** (added feature): a small runtime control on every map toggles between the
+  configured basemaps (topo / streets / satellite — all keyless). `setStyle` swaps the basemap;
+  the track, start pins and photo markers are re-added on each style load. The choice is
+  remembered for the session (sessionStorage).
 - **Index map:** load all hike tracks as **one GeoJSON FeatureCollection** into a single source,
   rendered with a line layer. Start pins as one GeoJSON source + symbol/circle layer. Do **not**
   create per-point or per-hike DOM markers — that won't scale and kills performance. Fit bounds

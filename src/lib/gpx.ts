@@ -112,6 +112,44 @@ function flatten(feature: Feature): { coords: Position[]; times: (string | null)
   return { coords, times };
 }
 
+/**
+ * Normalised playback timeline in [0,1] per trackpoint, for the replay player.
+ * Uses real per-point timestamps where present (so playback respects pauses);
+ * falls back to even spacing when a track has no usable times. Always
+ * monotonic non-decreasing. Aligned to `coordinates`.
+ */
+export function normalizedTimeline(data: GpxData): number[] {
+  const { times, coordinates } = data;
+  const n = coordinates.length;
+  if (n <= 1) return n === 1 ? [0] : [];
+
+  const firstT = times.find((t) => t != null) ?? null;
+  const lastT = [...times].reverse().find((t) => t != null) ?? null;
+  // No usable time span → even spacing by index.
+  if (firstT == null || lastT == null || lastT <= firstT) {
+    return coordinates.map((_, i) => i / (n - 1));
+  }
+
+  const span = lastT - firstT;
+  const f: (number | null)[] = times.map((t) => (t != null ? (t - firstT) / span : null));
+  if (f[0] == null) f[0] = 0;
+  // Linearly interpolate any interior null fractions by index, keeping monotonic.
+  let lastKnown = 0;
+  for (let i = 1; i < n; i++) {
+    if (f[i] != null) {
+      const a = f[lastKnown]!;
+      const b = f[i]!;
+      for (let j = lastKnown + 1; j < i; j++) f[j] = a + ((b - a) * (j - lastKnown)) / (i - lastKnown);
+      lastKnown = i;
+    }
+  }
+  if (f[n - 1] == null) {
+    const a = f[lastKnown]!;
+    for (let j = lastKnown + 1; j < n; j++) f[j] = a + ((1 - a) * (j - lastKnown)) / (n - 1 - lastKnown);
+  }
+  return f.map((v) => Math.max(0, Math.min(1, v as number)));
+}
+
 export class GpxError extends Error {}
 
 /**
