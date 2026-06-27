@@ -11,13 +11,20 @@ export interface HikeStats {
   descent_m: number;
   /** Human duration, e.g. "6h 20m". null when the GPX has no timestamps. */
   duration: string | null;
-  /** Duration in seconds (for aggregation). null when no timestamps. */
+  /** Elapsed (wall-clock) duration in seconds = end − start. null when no timestamps. */
   durationSeconds: number | null;
+  /** Moving time in seconds — excludes stopped segments (< MOVING_SPEED_KMH). null when no timestamps. */
+  movingSeconds: number | null;
+  /** Average moving pace, seconds per km (over moving distance). null when no timestamps. */
+  movingPaceSecPerKm: number | null;
   /** Number of trackpoints used. */
   points: number;
   /** ISO timestamps of first/last point, when present. */
   startTime: string | null;
   endTime: string | null;
+  /** Epoch ms of first/last point (for timezone-aware formatting). null when no timestamps. */
+  startEpochMs: number | null;
+  endEpochMs: number | null;
 }
 
 export interface GpxData {
@@ -39,6 +46,9 @@ export interface GpxData {
 }
 
 const EARTH_RADIUS_M = 6_371_000;
+
+/** Below this speed a segment counts as "stopped" and is excluded from moving time (SPEC §5). */
+export const MOVING_SPEED_KMH = 0.5;
 
 function haversineMeters(a: Position, b: Position): number {
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -185,12 +195,30 @@ export function parseGpx(xml: string): GpxData {
     if (lat > maxLat) maxLat = lat;
   }
 
-  // Distance + cumulative profile.
+  const timesMs = times.map((t) => (t ? new Date(t).getTime() : null));
+
+  // Distance + cumulative profile, plus moving time (excludes stopped segments).
   let distanceM = 0;
+  let movingSeconds = 0;
+  let movingDistanceM = 0;
   const cumulativeKm: number[] = [0];
   for (let i = 1; i < coords.length; i++) {
-    distanceM += haversineMeters(coords[i - 1], coords[i]);
+    const segM = haversineMeters(coords[i - 1], coords[i]);
+    distanceM += segM;
     cumulativeKm.push(distanceM / 1000);
+
+    const t0 = timesMs[i - 1];
+    const t1 = timesMs[i];
+    if (t0 != null && t1 != null && t1 > t0) {
+      const dtSec = (t1 - t0) / 1000;
+      const speedKmh = segM / 1000 / (dtSec / 3600);
+      // "Moving" = segments at or above a slow-walk threshold; slower segments
+      // (pauses, GPS jitter while stopped) are excluded from moving time.
+      if (speedKmh >= MOVING_SPEED_KMH) {
+        movingSeconds += dtSec;
+        movingDistanceM += segM;
+      }
+    }
   }
 
   // Elevation: smoothed, then thresholded accumulation to reject noise.
@@ -208,22 +236,25 @@ export function parseGpx(xml: string): GpxData {
     }
   }
 
-  // Duration from first/last timestamps.
+  // Elapsed duration from first/last timestamps.
   const firstTime = times.find((t) => t) ?? null;
   const lastTime = [...times].reverse().find((t) => t) ?? null;
+  const startEpochMs = firstTime ? new Date(firstTime).getTime() : null;
+  const endEpochMs = lastTime ? new Date(lastTime).getTime() : null;
   let durationSeconds: number | null = null;
-  if (firstTime && lastTime) {
-    const secs = (new Date(lastTime).getTime() - new Date(firstTime).getTime()) / 1000;
+  if (startEpochMs != null && endEpochMs != null) {
+    const secs = (endEpochMs - startEpochMs) / 1000;
     if (Number.isFinite(secs) && secs > 0) durationSeconds = secs;
   }
+  const hasTimes = durationSeconds != null;
+  const movingPaceSecPerKm =
+    hasTimes && movingSeconds > 0 && movingDistanceM > 0 ? movingSeconds / (movingDistanceM / 1000) : null;
 
   const line: Feature<LineString> = {
     type: 'Feature',
     properties: {},
     geometry: { type: 'LineString', coordinates: coords2d },
   };
-
-  const timesMs = times.map((t) => (t ? new Date(t).getTime() : null));
 
   return {
     line,
@@ -242,9 +273,13 @@ export function parseGpx(xml: string): GpxData {
       descent_m: Math.round(descent),
       duration: durationSeconds != null ? formatDuration(durationSeconds) : null,
       durationSeconds,
+      movingSeconds: hasTimes ? Math.round(movingSeconds) : null,
+      movingPaceSecPerKm: movingPaceSecPerKm != null ? Math.round(movingPaceSecPerKm) : null,
       points: coords.length,
       startTime: firstTime,
       endTime: lastTime,
+      startEpochMs,
+      endEpochMs,
     },
   };
 }

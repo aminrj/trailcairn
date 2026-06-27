@@ -10,6 +10,8 @@ import Replay from '../../components/Replay.astro';
 import { getVisibleHikes, hikeDir, loadGpx, resolveStats } from '../../lib/hikes';
 import { GpxError, normalizedTimeline } from '../../lib/gpx';
 import { processHikePhotos } from '../../lib/photos';
+import { resolveHikeTimeZone, formatClock } from '../../lib/timezone';
+import type { TimeStats } from '../../lib/stats';
 
 export async function getStaticPaths() {
   const hikes = await getVisibleHikes();
@@ -39,9 +41,29 @@ const stats = gpx
       duration: hike.data.duration ?? null,
     };
 
-// Photos: EXIF/timestamp placement + derivatives (slice 4).
+// Resolve the hike's timezone (start coords → IANA zone, frontmatter override,
+// default) and build local time-of-day stats when the GPX has timestamps.
+const tz = resolveHikeTimeZone({
+  lat: gpx?.start[1],
+  lng: gpx?.start[0],
+  frontmatterTz: hike.data.timezone,
+});
+let timeStats: TimeStats | null = null;
+if (gpx?.stats.startEpochMs != null && gpx.stats.endEpochMs != null && gpx.stats.movingSeconds != null) {
+  timeStats = {
+    startClock: formatClock(gpx.stats.startEpochMs, tz.id),
+    endClock: formatClock(gpx.stats.endEpochMs, tz.id),
+    movingSeconds: gpx.stats.movingSeconds,
+    elapsedSeconds: gpx.stats.durationSeconds!,
+    paceSecPerKm: gpx.stats.movingPaceSecPerKm,
+    tzId: tz.id,
+  };
+}
+
+// Photos: EXIF/timestamp placement + derivatives (slice 4). The hike's timezone
+// is shared so EXIF local-without-zone timestamps resolve to UTC consistently.
 const { photos } = await processHikePhotos(
-  { slug: hike.id, dir: hikeDir(hike), cover: hike.data.cover },
+  { slug: hike.id, dir: hikeDir(hike), cover: hike.data.cover, timezone: tz.id },
   gpx,
 );
 const mapPhotos: MapPhoto[] = photos
@@ -89,6 +111,7 @@ const mapPhotos: MapPhoto[] = photos
       ascent_m={stats.ascent_m}
       descent_m={stats.descent_m}
       duration={stats.duration}
+      timeStats={timeStats}
     />
 
     {gpx && <ElevationProfile elevations={gpx.elevations} cumulativeKm={gpx.cumulativeKm} />}

@@ -4,6 +4,7 @@ import exifr from 'exifr';
 import sharp from 'sharp';
 import heicConvert from 'heic-convert';
 import type { GpxData } from './gpx';
+import { zoneOffsetMinutes } from './timezone';
 
 // NOTE: this module deliberately has no `astro:content` dependency so the
 // standalone validate script (plain Node via tsx) can reuse its EXIF logic.
@@ -11,11 +12,11 @@ import type { GpxData } from './gpx';
 // --- config -----------------------------------------------------------------
 
 /**
- * Fallback timezone offset (hours, e.g. 2 for UTC+2) used to interpret EXIF
- * timestamps that lack an explicit offset, when matching photos to GPX time
- * (SPEC §6). Modern phone photos usually carry their own OffsetTimeOriginal,
- * which always wins over this. A wrong value shifts every timestamp-placed
- * photo — validate surfaces large skews.
+ * Last-resort timezone offset (hours) for interpreting EXIF timestamps that
+ * lack an explicit offset, when the hike's timezone is unknown (no zone, no
+ * coords). The normal path is: embedded EXIF offset → the hike's resolved
+ * timezone (shared lib/timezone.ts) → this env. A wrong value shifts every
+ * timestamp-placed photo; validate surfaces large skews.
  */
 const FALLBACK_UTC_OFFSET_HOURS = Number(process.env.PHOTO_UTC_OFFSET_HOURS ?? 0);
 
@@ -133,6 +134,8 @@ export interface HikePhotoInput {
   dir: string;
   /** Frontmatter `cover` value (path or filename), if any. */
   cover?: string | null;
+  /** Hike's IANA timezone (shared resolver) — used to read EXIF local times. */
+  timezone?: string | null;
 }
 
 export interface PhotoExif {
@@ -190,25 +193,35 @@ async function decodeToBuffer(absPath: string): Promise<Buffer> {
   return raw;
 }
 
-/** Parse "YYYY:MM:DD HH:MM:SS" + optional "+HH:MM" offset into a UTC epoch (ms). */
+/**
+ * Parse "YYYY:MM:DD HH:MM:SS" + optional "+HH:MM" offset into a UTC epoch (ms).
+ * Offset priority: embedded EXIF offset → the hike's timezone (DST-correct at
+ * the photo's date) → the env fallback.
+ */
 function exifToEpochMs(
   dt: string,
   offsetStr: string | undefined,
+  zoneId?: string | null,
 ): { ms: number; offsetSource: 'exif' | 'fallback' } | null {
   const m = dt.match(/^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
   if (!m) return null;
   const [, Y, Mo, D, H, Mi, S] = m.map(Number) as unknown as number[];
+  const wall = Date.UTC(Y, Mo - 1, D, H, Mi, S);
   let offsetMin: number;
   let offsetSource: 'exif' | 'fallback';
   const om = offsetStr?.match(/^([+-])(\d{2}):(\d{2})$/);
   if (om) {
     offsetMin = (om[1] === '-' ? -1 : 1) * (Number(om[2]) * 60 + Number(om[3]));
     offsetSource = 'exif';
+  } else if (zoneId) {
+    // `wall` is off the true instant by the offset, but that's fine for
+    // determining the offset (DST doesn't flip within that error).
+    offsetMin = zoneOffsetMinutes(wall, zoneId);
+    offsetSource = 'fallback';
   } else {
     offsetMin = FALLBACK_UTC_OFFSET_HOURS * 60;
     offsetSource = 'fallback';
   }
-  const wall = Date.UTC(Y, Mo - 1, D, H, Mi, S);
   return { ms: wall - offsetMin * 60_000, offsetSource };
 }
 
@@ -262,7 +275,7 @@ async function ensureDerivative(
  * Never throws — returns "nothing found" on any read error. Used by both the
  * build pipeline and the validate script.
  */
-export async function inspectPhotoExif(absPath: string): Promise<PhotoExif> {
+export async function inspectPhotoExif(absPath: string, zoneId?: string | null): Promise<PhotoExif> {
   let gps: { latitude?: number; longitude?: number } | undefined;
   let timeData: Record<string, unknown> | undefined;
   try {
@@ -281,7 +294,7 @@ export async function inspectPhotoExif(absPath: string): Promise<PhotoExif> {
   const hasGps = gps?.latitude != null && gps?.longitude != null;
   const dtRaw = (timeData?.DateTimeOriginal ?? timeData?.CreateDate) as string | undefined;
   const offRaw = (timeData?.OffsetTimeOriginal ?? timeData?.OffsetTime) as string | undefined;
-  const epoch = dtRaw ? exifToEpochMs(dtRaw, offRaw) : null;
+  const epoch = dtRaw ? exifToEpochMs(dtRaw, offRaw, zoneId) : null;
   return {
     hasGps,
     lat: hasGps ? gps!.latitude! : null,
@@ -428,7 +441,8 @@ export async function processHikePhotos(
 
       // EXIF read from the ORIGINAL bytes (works for HEIC + JPEG). Cheap, so it
       // runs every time — placement can depend on _photos.json / GPX changes.
-      const exif = await inspectPhotoExif(absPath);
+      // The hike's timezone resolves EXIF local-without-zone timestamps.
+      const exif = await inspectPhotoExif(absPath, input.timezone);
 
       // Placement priority: override → EXIF GPS → timestamp → unplaced.
       let lat: number | null = null;

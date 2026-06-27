@@ -11,6 +11,12 @@ import {
   isPhotoFile,
   MAX_MATCH_GAP_MINUTES,
 } from '../src/lib/photos.ts';
+import {
+  resolveHikeTimeZone,
+  isValidTimeZone,
+  zoneOffsetMinutes,
+  roughOffsetMinutesFromLng,
+} from '../src/lib/timezone.ts';
 
 const HIKES_DIR = path.resolve('src/content/hikes');
 const REQUIRED = ['title', 'date', 'location', 'summary', 'track'];
@@ -75,6 +81,25 @@ async function validateHike(slug) {
           (hasTimes ? ` · ${gpx.stats.duration ?? '—'}` : ' · no timestamps'),
       );
       if (!hasTimes) warnings.push('GPX has no per-point timestamps (timestamp photo matching disabled)');
+
+      // --- timezone sanity ---
+      if (data.timezone && !isValidTimeZone(data.timezone)) {
+        errors.push(`timezone is not a valid IANA zone: ${data.timezone}`);
+      }
+      const [lng, lat] = gpx.start;
+      const tz = resolveHikeTimeZone({ lat, lng, frontmatterTz: data.timezone });
+      if (isValidTimeZone(tz.id) && hasTimes) {
+        const actual = zoneOffsetMinutes(gpx.stats.startEpochMs, tz.id);
+        const expected = roughOffsetMinutesFromLng(lng);
+        notes.push(`timezone: ${tz.id} (${tz.source}, UTC${actual >= 0 ? '+' : ''}${actual / 60})`);
+        // Gross mismatch (e.g. a Swedish hike resolving to a US offset).
+        if (Math.abs(actual - expected) > 180) {
+          warnings.push(
+            `timezone ${tz.id} (UTC${actual >= 0 ? '+' : ''}${actual / 60}) looks wrong for longitude ` +
+              `${lng.toFixed(1)} (≈UTC${expected >= 0 ? '+' : ''}${expected / 60}) — set a \`timezone\` in frontmatter`,
+          );
+        }
+      }
     } catch (e) {
       if (e instanceof GpxError) errors.push(`GPX: ${e.message}`);
       else errors.push(`GPX failed to parse: ${e.message}`);

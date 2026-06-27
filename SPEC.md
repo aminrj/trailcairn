@@ -193,6 +193,22 @@ This is the feature the owner cares most about. Make adding a hike feel instant.
 Per-hike stats (derived or overridden): distance_km, ascent_m, descent_m, duration, date,
 location.
 
+**Time-based stats (derived from the GPX, shown only when it has per-point timestamps):**
+- **Start–End** — first/last trackpoint times, shown in the hike's **local timezone** (HH:MM).
+- **Moving vs Elapsed** — elapsed = end − start; moving excludes "stopped" segments (those below
+  **0.5 km/h** — `MOVING_SPEED_KMH`). Both are shown (the gap is meaningful). Durations as H:MM.
+- **Pace** — average moving pace over the moving distance, M:SS/km.
+
+If a GPX lacks per-point timestamps these degrade away (the band falls back to `duration`).
+
+**Timezone resolution (the UTC-vs-local problem, solved once):** GPX times are UTC; displaying
+them raw would be wrong. A single helper (`lib/timezone.ts`) resolves a hike's timezone — from the
+track's **start coordinates** (`tz-lookup` → IANA zone, automatic and correct abroad), overridable
+by a `timezone` frontmatter field, with a final default (`DEFAULT_TIMEZONE`, default `UTC`). The
+same resolver is reused by **photo placement** to interpret EXIF local-without-zone timestamps
+(DST handled per-instant via Intl). `npm run validate` reports the resolved zone and flags a gross
+mismatch against the longitude (e.g. a Swedish hike resolving to a US offset).
+
 Lifetime summary band on the index page, computed at build time across all published hikes:
 total distance, total ascent, number of hikes, number of distinct days out, and the date range
 (first hike → latest). Keep it to ~5 numbers. Render in the mono font. Round all numbers

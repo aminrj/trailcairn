@@ -16,6 +16,16 @@ export interface LifetimeStats {
   lastDate: Date | null;
 }
 
+/** Local-timezone time-of-day stats for the per-hike band (SPEC §5). */
+export interface TimeStats {
+  startClock: string; // local "HH:MM"
+  endClock: string; // local "HH:MM"
+  movingSeconds: number;
+  elapsedSeconds: number;
+  paceSecPerKm: number | null;
+  tzId: string; // resolved IANA zone (for the title/tooltip)
+}
+
 export function aggregateLifetime(lines: HikeStatLine[]): LifetimeStats {
   let totalDistanceKm = 0;
   let totalAscentM = 0;

@@ -34,6 +34,10 @@ const hikes = defineCollection({
     descent_m: z.number().optional(),
     duration: z.string().optional(), // e.g. "6h 20m"
 
+    // Timezone override (IANA id, e.g. "Europe/Stockholm"). Optional — normally
+    // resolved automatically from the track's start coordinates (SPEC §5).
+    timezone: z.string().optional(),
+
     // Privacy: when true, fuzz/omit the start-point pin (SPEC §6).
     hidePrecisePins: z.boolean().default(false),
   }),

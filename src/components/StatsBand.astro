@@ -1,6 +1,10 @@
 ---
-// Per-hike stats band (SPEC §5), rendered in mono. Values are already
-// resolved (derived-or-overridden); pass null for unknowns.
+// Per-hike stats band (SPEC §5), rendered in mono. Core values are already
+// resolved (derived-or-overridden); pass null for unknowns. Time stats are
+// optional and only present when the GPX has per-point timestamps — times are
+// shown in the hike's local timezone (resolved in [slug].astro).
+import type { TimeStats } from '../lib/stats';
+
 interface Props {
   date: string;
   location: string;
@@ -8,17 +12,34 @@ interface Props {
   ascent_m: number | null;
   descent_m: number | null;
   duration: string | null;
+  timeStats?: TimeStats | null;
 }
-const { date, location, distance_km, ascent_m, descent_m, duration } = Astro.props;
+const { date, location, distance_km, ascent_m, descent_m, duration, timeStats } = Astro.props;
 
-const stats: { label: string; value: string }[] = [
+// Durations as H:MM, pace as M:SS/km — consistent, quiet rounding.
+const hm = (sec: number) => `${Math.floor(sec / 3600)}:${String(Math.round((sec % 3600) / 60)).padStart(2, '0')}`;
+const pace = (sp: number) => `${Math.floor(sp / 60)}:${String(Math.round(sp % 60)).padStart(2, '0')}/km`;
+
+const stats: { label: string; value: string; title?: string }[] = [
   { label: 'Date', value: date },
   { label: 'Location', value: location },
   { label: 'Distance', value: distance_km != null ? `${distance_km} km` : '—' },
   { label: 'Ascent', value: ascent_m != null ? `${ascent_m} m` : '—' },
   { label: 'Descent', value: descent_m != null ? `${descent_m} m` : '—' },
-  { label: 'Duration', value: duration ?? '—' },
 ];
+
+if (timeStats) {
+  // Times available → show the day's window, moving vs elapsed, and pace.
+  stats.push(
+    { label: 'Start–End', value: `${timeStats.startClock}–${timeStats.endClock}`, title: timeStats.tzId },
+    { label: 'Moving', value: hm(timeStats.movingSeconds) },
+    { label: 'Elapsed', value: hm(timeStats.elapsedSeconds) },
+  );
+  if (timeStats.paceSecPerKm != null) stats.push({ label: 'Pace', value: pace(timeStats.paceSecPerKm) });
+} else {
+  // No per-point timestamps → fall back to whatever duration we have (or —).
+  stats.push({ label: 'Duration', value: duration ?? '—' });
+}
 ---
 
 <div class="statsband">
@@ -26,7 +47,9 @@ const stats: { label: string; value: string }[] = [
     stats.map((s) => (
       <div class="stat">
         <span class="label">{s.label}</span>
-        <span class="value">{s.value}</span>
+        <span class="value" title={s.title}>
+          {s.value}
+        </span>
       </div>
     ))
   }
