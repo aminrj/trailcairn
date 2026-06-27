@@ -332,8 +332,8 @@ const config = {
               'circle-color': '#3f6b4d',
               'circle-opacity': 0.92,
               'circle-stroke-color': '#fff',
-              'circle-stroke-width': 2,
-              'circle-radius': ['step', ['get', 'point_count'], 15, 5, 19, 10, 25],
+              'circle-stroke-width': 2.5,
+              'circle-radius': ['step', ['get', 'point_count'], 24, 5, 30, 10, 40],
             },
           });
           map.addLayer({
@@ -341,7 +341,7 @@ const config = {
             type: 'symbol',
             source: 'pins',
             filter: ['has', 'point_count'],
-            layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': ['Noto Sans Bold'], 'text-size': 13 },
+            layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': ['Noto Sans Bold'], 'text-size': 17 },
             paint: { 'text-color': '#fff' },
           });
           // Individual cairn pins with a collision-aware place/date label.
@@ -352,7 +352,7 @@ const config = {
             filter: ['!', ['has', 'point_count']],
             layout: {
               'icon-image': 'hike-pin',
-              'icon-size': 1,
+              'icon-size': 1.7,
               'icon-anchor': 'bottom',
               'icon-allow-overlap': true,
               'text-field': [
