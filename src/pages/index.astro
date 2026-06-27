@@ -3,12 +3,23 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import Map from '../components/Map.astro';
 import LifetimeBand from '../components/LifetimeBand.astro';
 import HikeSearch from '../components/HikeSearch.astro';
+import RouteMotif from '../components/RouteMotif.astro';
 import { SITE_TAGLINE } from '../consts';
-import { getVisibleHikes, getIndexMapData, hikeDir } from '../lib/hikes';
+import { getVisibleHikes, getIndexMapData, hikeDir, type IndexMapHike } from '../lib/hikes';
 import { getHikeCover, type HikeCover } from '../lib/photos';
 
 const hikes = await getVisibleHikes();
 const mapData = await getIndexMapData();
+
+// Per-hike extras for the magazine cards (stats line + route motif), keyed by
+// slug. `Map` here is the component, so use a plain object.
+const cardData: Record<string, IndexMapHike> = {};
+for (const h of mapData.hikes) cardData[h.slug] = h;
+
+const statLine = (h: IndexMapHike | undefined) =>
+  [h?.distance_km != null ? `${h.distance_km} km` : null, h?.ascent_m != null ? `${h.ascent_m} m` : null, h?.duration ?? null]
+    .filter(Boolean)
+    .join('  ·  ');
 
 // Cover thumbnail per hike for the logbook (only the cover is processed, not
 // every photo — see getHikeCover). Plain object: `Map` here is the component.
@@ -62,33 +73,41 @@ const searchText = (h: (typeof hikes)[number]) =>
         <ul class="hike-list">
           {hikes.map((hike) => {
             const cover = covers[hike.id];
+            const extra = cardData[hike.id];
+            const stats = statLine(extra);
             return (
               <li class="hike-card" data-slug={hike.id} data-search={searchText(hike)}>
                 <a class="hike-card-link" href={`/hikes/${hike.id}`}>
-                  {cover ? (
-                    <img
-                      class="hike-card-thumb"
-                      src={cover.thumb}
-                      width={cover.width}
-                      height={cover.height}
-                      loading="lazy"
-                      decoding="async"
-                      alt=""
-                      style={`background-image:url(${cover.blur});background-size:cover`}
-                    />
-                  ) : (
-                    <span class="hike-card-thumb hike-card-thumb--empty" aria-hidden="true" />
-                  )}
+                  <span class="hike-card-cover">
+                    {cover ? (
+                      <img
+                        src={cover.medium}
+                        width={cover.width}
+                        height={cover.height}
+                        loading="lazy"
+                        decoding="async"
+                        alt=""
+                        style={`background-image:url(${cover.blur});background-size:cover`}
+                      />
+                    ) : (
+                      <span class="hike-card-cover--empty" aria-hidden="true" />
+                    )}
+                  </span>
                   <span class="hike-card-body">
                     <span class="hike-card-title">
                       {hike.data.title}
                       {hike.data.status === 'draft' && <span class="draft-badge">draft</span>}
                     </span>
-                    <span class="meta hike-card-meta">
-                      {dateFmt.format(hike.data.date)} · {hike.data.location}
+                    {stats && <span class="hike-card-stats">{stats}</span>}
+                    <span class="hike-card-meta">
+                      {dateFmt.format(hike.data.date)}
+                      <span class="hike-card-loc"> · {hike.data.location}</span>
                     </span>
                     <span class="hike-card-summary">{hike.data.summary}</span>
                   </span>
+                  {extra && extra.coords.length > 1 && (
+                    <RouteMotif lines={[extra.coords]} width={140} height={90} strokeWidth={2} class="hike-card-route" />
+                  )}
                 </a>
               </li>
             );

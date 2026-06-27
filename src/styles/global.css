@@ -124,7 +124,8 @@ a {
   color: var(--ink-soft);
 }
 
-/* Hike logbook (index): a quiet, uniform list with a warm cover thumbnail. */
+/* Hike logbook (index): magazine-style cards — cover, serif title, quiet stats,
+   and the route line as a small signature. Bigger, fewer, more deliberate. */
 .hike-list {
   list-style: none;
   padding: 0;
@@ -137,57 +138,91 @@ a {
   border-bottom: 1px solid var(--line);
 }
 .hike-card-link {
-  display: flex;
-  gap: 1.1rem;
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr) auto;
+  gap: 1.9rem;
   align-items: center;
-  padding: 1.1rem 0.25rem;
+  padding: 1.9rem 0.25rem;
   text-decoration: none;
   color: inherit;
-  border-radius: 8px;
-  transition: background-color 0.15s ease;
 }
-.hike-card-link:hover {
-  background: rgba(63, 107, 77, 0.05);
-}
-.hike-card-thumb {
-  flex: none;
-  width: 84px;
-  height: 84px;
-  object-fit: cover;
-  border-radius: 8px;
-  background-color: #e7e3da;
-  border: 1px solid var(--line);
-}
-.hike-card-thumb--empty {
+.hike-card-cover {
   display: block;
+  aspect-ratio: 3 / 2;
+  border-radius: 12px;
+  overflow: hidden;
+  background-color: #e7e3da;
+}
+.hike-card-cover img,
+.hike-card-cover--empty {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .hike-card-body {
   display: flex;
   flex-direction: column;
-  gap: 0.18rem;
   min-width: 0;
 }
 .hike-card-title {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 1.2rem;
-  line-height: 1.2;
+  font-size: 1.7rem;
+  line-height: 1.15;
   color: var(--ink);
+  transition: color 0.15s ease;
 }
 .hike-card-link:hover .hike-card-title {
   color: var(--accent);
 }
+.hike-card-stats {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  margin-top: 0.55rem;
+}
 .hike-card-meta {
-  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  margin-top: 0.3rem;
 }
 .hike-card-summary {
   color: var(--ink-soft);
   font-size: 0.95rem;
+  margin-top: 0.6rem;
   overflow: hidden;
   text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+}
+/* Route-line signature on the far side of the card. */
+.hike-card-route {
+  width: 140px;
+  color: var(--accent);
+  opacity: 0.5;
+}
+.hike-card-link:hover .hike-card-route {
+  opacity: 0.85;
+}
+@media (max-width: 660px) {
+  .hike-card-link {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding: 1.4rem 0.25rem;
+  }
+  .hike-card-cover {
+    aspect-ratio: 16 / 9;
+  }
+  .hike-card-route {
+    display: none;
+  }
+  .hike-card-title {
+    font-size: 1.5rem;
+  }
 }
 .draft-badge {
   font-family: var(--font-mono);

@@ -54,7 +54,11 @@ export interface IndexMapHike {
   title: string;
   date: string;
   distance_km: number | null;
+  ascent_m: number | null;
+  duration: string | null;
   cover: string | null;
+  /** Track coordinates for the route-line motif on the index card (subsampled). */
+  coords: [number, number][];
 }
 
 export interface IndexMapData {
@@ -108,7 +112,10 @@ export async function getIndexMapData(): Promise<IndexMapData> {
       title: hike.data.title,
       date: dateFmt.format(hike.data.date),
       distance_km: hike.data.distance_km ?? gpx.stats.distance_km,
+      ascent_m: hike.data.ascent_m ?? gpx.stats.ascent_m,
+      duration: hike.data.duration ?? gpx.stats.duration,
       cover: hike.data.cover ?? null,
+      coords: gpx.coordinates,
     });
     const [[bMinLon, bMinLat], [bMaxLon, bMaxLat]] = gpx.bounds;
     minLon = Math.min(minLon, bMinLon);
