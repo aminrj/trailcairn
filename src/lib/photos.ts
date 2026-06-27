@@ -24,6 +24,7 @@ const MAX_MATCH_GAP_MIN = 90;
 
 const SIZES = { thumb: 320, medium: 1000, full: 1800 } as const;
 type SizeName = keyof typeof SIZES;
+const SIZE_NAMES = Object.keys(SIZES) as SizeName[];
 const QUALITY: Record<SizeName, number> = { thumb: 70, medium: 78, full: 80 };
 
 const PHOTO_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif']);
@@ -35,6 +36,54 @@ const HEIC_EXTS = new Set(['.heic', '.heif']);
 const GEN_ROOT = path.resolve('public/_gen/photos');
 function genUrl(slug: string, file: string): string {
   return `/_gen/photos/${slug}/${file}`;
+}
+
+// Per-hike image cache: lets us skip the (slow) HEIC decode + resize when the
+// derivatives already exist and the source file is unchanged. Keyed by
+// filename → { mtimeMs, width, height, blur }. Stored alongside the derivatives
+// (gitignored). This is what keeps dev hot-reload fast on HEIC-heavy hikes.
+interface ImageCacheEntry {
+  mtimeMs: number;
+  width: number;
+  height: number;
+  blur: string;
+}
+type ImageCache = Record<string, ImageCacheEntry>;
+
+function cachePath(slug: string): string {
+  return path.join(GEN_ROOT, slug, '_cache.json');
+}
+function readImageCache(slug: string): ImageCache {
+  try {
+    return JSON.parse(fs.readFileSync(cachePath(slug), 'utf-8')) as ImageCache;
+  } catch {
+    return {};
+  }
+}
+function writeImageCache(slug: string, cache: ImageCache): void {
+  try {
+    fs.mkdirSync(path.join(GEN_ROOT, slug), { recursive: true });
+    fs.writeFileSync(cachePath(slug), JSON.stringify(cache));
+  } catch {
+    /* cache is best-effort */
+  }
+}
+function derivativesFresh(slug: string, base: string, srcMtimeMs: number): boolean {
+  return SIZE_NAMES.every((s) => {
+    const p = path.join(GEN_ROOT, slug, `${base}-${s}.webp`);
+    try {
+      return fs.statSync(p).mtimeMs >= srcMtimeMs;
+    } catch {
+      return false;
+    }
+  });
+}
+function derivativeUrls(slug: string, base: string): Record<SizeName, string> {
+  return {
+    thumb: genUrl(slug, `${base}-thumb.webp`),
+    medium: genUrl(slug, `${base}-medium.webp`),
+    full: genUrl(slug, `${base}-full.webp`),
+  };
 }
 
 // --- types ------------------------------------------------------------------
@@ -268,25 +317,60 @@ export async function processHikePhotos(
   const files = listPhotoFiles(photosDir);
 
   const photos: ProcessedPhoto[] = [];
+  const cache = readImageCache(slug);
+  let cacheDirty = false;
+  let coldDecodes = 0;
 
   for (const filename of files) {
     const absPath = path.join(photosDir, filename);
     const ov = overrides[filename] ?? {};
     try {
       const srcMtimeMs = fs.statSync(absPath).mtimeMs;
-      const decoded = await decodeToBuffer(absPath);
-      const meta = await sharp(decoded).rotate().metadata();
       const base = path.parse(filename).name;
 
-      const [thumb, medium, full] = await Promise.all([
-        ensureDerivative(decoded, slug, base, 'thumb', srcMtimeMs),
-        ensureDerivative(decoded, slug, base, 'medium', srcMtimeMs),
-        ensureDerivative(decoded, slug, base, 'full', srcMtimeMs),
-      ]);
-      const blurBuf = await sharp(decoded).rotate().resize({ width: 16 }).webp({ quality: 40 }).toBuffer();
-      const blur = `data:image/webp;base64,${blurBuf.toString('base64')}`;
+      // Reuse cached image work when the source is unchanged and derivatives
+      // still exist on disk — this avoids re-decoding HEIC on every request.
+      let width: number;
+      let height: number;
+      let blur: string;
+      const cached = cache[filename];
+      if (cached && cached.mtimeMs === srcMtimeMs && derivativesFresh(slug, base, srcMtimeMs)) {
+        // Fast path: nothing changed.
+        ({ width, height, blur } = cached);
+      } else if (derivativesFresh(slug, base, srcMtimeMs)) {
+        // Derivatives exist and are current but the cache entry is missing/stale
+        // (e.g. cache cleared, fresh checkout). Rebuild it from the existing
+        // WebP — far cheaper than re-decoding a HEIC original.
+        const fullPath = path.join(GEN_ROOT, slug, `${base}-full.webp`);
+        const meta = await sharp(fullPath).metadata(); // aspect ratio matches original
+        width = meta.width ?? 0;
+        height = meta.height ?? 0;
+        const blurBuf = await sharp(fullPath).resize({ width: 16 }).webp({ quality: 40 }).toBuffer();
+        blur = `data:image/webp;base64,${blurBuf.toString('base64')}`;
+        cache[filename] = { mtimeMs: srcMtimeMs, width, height, blur };
+        cacheDirty = true;
+      } else {
+        // Cold path: decode the original (HEIC → JPEG when needed) and generate
+        // all derivatives. The expensive case — cached thereafter.
+        coldDecodes++;
+        const decoded = await decodeToBuffer(absPath);
+        const meta = await sharp(decoded).rotate().metadata();
+        width = meta.width ?? 0;
+        height = meta.height ?? 0;
+        await Promise.all([
+          ensureDerivative(decoded, slug, base, 'thumb', srcMtimeMs),
+          ensureDerivative(decoded, slug, base, 'medium', srcMtimeMs),
+          ensureDerivative(decoded, slug, base, 'full', srcMtimeMs),
+        ]);
+        const blurBuf = await sharp(decoded).rotate().resize({ width: 16 }).webp({ quality: 40 }).toBuffer();
+        blur = `data:image/webp;base64,${blurBuf.toString('base64')}`;
+        cache[filename] = { mtimeMs: srcMtimeMs, width, height, blur };
+        cacheDirty = true;
+      }
+      const { thumb, medium, full } = derivativeUrls(slug, base);
 
-      // EXIF read from the ORIGINAL bytes (works for HEIC + JPEG).
+      // EXIF read from the ORIGINAL bytes (works for HEIC + JPEG). Cheap, so it
+      // runs every time — placement can depend on _photos.json / GPX changes.
       const exif = await inspectPhotoExif(absPath);
 
       // Placement priority: override → EXIF GPS → timestamp → unplaced.
@@ -325,8 +409,8 @@ export async function processHikePhotos(
         lat,
         lng,
         source,
-        width: meta.width ?? 0,
-        height: meta.height ?? 0,
+        width,
+        height,
         blur,
         derivatives: { thumb, medium, full },
         diagnostics: {
@@ -340,6 +424,13 @@ export async function processHikePhotos(
       // Unreadable/corrupt image: skip it rather than fail the build.
       continue;
     }
+  }
+
+  if (cacheDirty) writeImageCache(slug, cache);
+  if (coldDecodes > 0) {
+    console.info(
+      `[photos] ${slug}: generated derivatives for ${coldDecodes} photo(s) — one-time, cached afterwards.`,
+    );
   }
 
   // Order: explicit `order` first, then filename order (stable).
