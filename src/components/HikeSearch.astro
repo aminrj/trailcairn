@@ -1,0 +1,73 @@
+---
+// Live client-side filter for the home page (SPEC §3.1). Filters the overview
+// map's pins AND the logbook cards in real time by title/location/tags/date/
+// summary — it never replaces the map. (Pagefind remains the project's
+// full-text index, generated at build; this filter works in dev and prod.)
+---
+
+<div class="hike-search">
+  <input
+    type="search"
+    class="hike-search-input"
+    placeholder="Filter hikes by place, date or tag…"
+    aria-label="Filter hikes"
+    autocomplete="off"
+    data-hike-filter
+  />
+</div>
+
+<style>
+  .hike-search {
+    margin: 0 0 1rem;
+  }
+  .hike-search-input {
+    width: 100%;
+    max-width: 28rem;
+    font-family: var(--font-body, sans-serif);
+    font-size: 0.95rem;
+    padding: 0.55rem 0.8rem;
+    color: var(--ink, #1a1a17);
+    background: #fff;
+    border: 1px solid var(--line, #e4e0d8);
+    border-radius: 8px;
+  }
+  .hike-search-input:focus {
+    outline: none;
+    border-color: var(--accent, #3f6b4d);
+  }
+</style>
+
+<script>
+  function initHikeSearch() {
+    const input = document.querySelector<HTMLInputElement>('[data-hike-filter]');
+    if (!input) return;
+    const mapEl = document.getElementById('index-map') as (HTMLElement & { __setHikeFilter?: (s: Set<string> | null) => void }) | null;
+    const cards = Array.from(document.querySelectorAll<HTMLElement>('.hike-card[data-search]'));
+    const noMatches = document.querySelector<HTMLElement>('[data-no-matches]');
+
+    const combining = new RegExp('[\\u0300-\\u036f]', 'g');
+    const fold = (s: string) => s.normalize('NFD').replace(combining, '').toLowerCase();
+
+    function apply() {
+      const q = fold(input!.value.trim());
+      const slugs = new Set<string>();
+      let visible = 0;
+      for (const card of cards) {
+        const match = !q || (card.dataset.search ?? '').includes(q);
+        card.hidden = !match;
+        if (match) {
+          visible++;
+          if (card.dataset.slug) slugs.add(card.dataset.slug);
+        }
+      }
+      // Map stays put; only its pins/tracks filter. null restores everything.
+      mapEl?.__setHikeFilter?.(q ? slugs : null);
+      if (noMatches) noMatches.hidden = !(q && visible === 0);
+    }
+
+    input.addEventListener('input', apply);
+  }
+
+  if (document.readyState !== 'loading') initHikeSearch();
+  else document.addEventListener('DOMContentLoaded', initHikeSearch);
+</script>

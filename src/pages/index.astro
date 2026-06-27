@@ -2,7 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Map from '../components/Map.astro';
 import LifetimeBand from '../components/LifetimeBand.astro';
-import Search from '../components/Search.astro';
+import HikeSearch from '../components/HikeSearch.astro';
 import { SITE_TAGLINE } from '../consts';
 import { getVisibleHikes, getIndexMapData } from '../lib/hikes';
 
@@ -10,6 +10,15 @@ const hikes = await getVisibleHikes();
 const mapData = await getIndexMapData();
 
 const dateFmt = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
+
+// Searchable text per hike for the live filter (title/location/tags/date/summary).
+// Diacritics are folded (å→a) so "laxa" matches "Laxå".
+const COMBINING = new RegExp('[\\u0300-\\u036f]', 'g');
+const fold = (s: string) => s.normalize('NFD').replace(COMBINING, '').toLowerCase();
+const searchText = (h: (typeof hikes)[number]) =>
+  fold(
+    [h.data.title, h.data.location, (h.data.tags ?? []).join(' '), dateFmt.format(h.data.date), h.data.summary].join(' '),
+  );
 ---
 
 <BaseLayout>
@@ -20,43 +29,46 @@ const dateFmt = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
 
   <LifetimeBand stats={mapData.lifetime} />
 
-  {
-    mapData.bounds && (
-      <Map
-        id="index-map"
-        lines={mapData.lines}
-        starts={mapData.starts}
-        bounds={mapData.bounds}
-        hikes={mapData.hikes}
-        overview={true}
-        defaultBasemap="pale"
-        height="62vh"
-      />
-    )
-  }
+  {hikes.length > 0 && <HikeSearch />}
 
-  <Search />
+  {/* The overview map is the permanent centerpiece — always rendered, even with no hikes. */}
+  <Map
+    id="index-map"
+    lines={mapData.lines}
+    starts={mapData.starts}
+    bounds={mapData.bounds}
+    hikes={mapData.hikes}
+    overview={true}
+    defaultBasemap="pale"
+    height="62vh"
+  />
 
   {
     hikes.length === 0 ? (
       <p class="placeholder-note">
-        No hikes yet. Copy <code>src/content/hikes/_TEMPLATE/</code> to a new folder to add one.
+        No hikes yet. Copy <code>src/content/hikes/_TEMPLATE/</code> to a new folder to add one — it
+        will appear on the map above.
       </p>
     ) : (
-      <ul class="hike-list">
-        {hikes.map((hike) => (
-          <li class="hike-card">
-            <h2>
-              <a href={`/hikes/${hike.id}`}>{hike.data.title}</a>{' '}
-              {hike.data.status === 'draft' && <span class="draft-badge">draft</span>}
-            </h2>
-            <p class="meta">
-              {dateFmt.format(hike.data.date)} · {hike.data.location}
-            </p>
-            <p>{hike.data.summary}</p>
-          </li>
-        ))}
-      </ul>
+      <>
+        <ul class="hike-list">
+          {hikes.map((hike) => (
+            <li class="hike-card" data-slug={hike.id} data-search={searchText(hike)}>
+              <h2>
+                <a href={`/hikes/${hike.id}`}>{hike.data.title}</a>{' '}
+                {hike.data.status === 'draft' && <span class="draft-badge">draft</span>}
+              </h2>
+              <p class="meta">
+                {dateFmt.format(hike.data.date)} · {hike.data.location}
+              </p>
+              <p>{hike.data.summary}</p>
+            </li>
+          ))}
+        </ul>
+        <p class="placeholder-note" data-no-matches hidden>
+          No hikes match your search — clear it to see them all on the map again.
+        </p>
+      </>
     )
   }
 </BaseLayout>

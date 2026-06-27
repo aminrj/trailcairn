@@ -26,8 +26,8 @@ interface Props {
   lines: Feature<LineString>[];
   /** Start pins, [lon, lat], index-aligned with `lines`. null omits a pin (privacy). */
   starts?: ([number, number] | null)[];
-  /** Bounds [[minLon,minLat],[maxLon,maxLat]] to fit on load. */
-  bounds: [[number, number], [number, number]];
+  /** Bounds [[minLon,minLat],[maxLon,maxLat]] to fit on load. null → default view (no hikes). */
+  bounds: [[number, number], [number, number]] | null;
   /** Optional per-hike metadata for index popups, keyed by line index. */
   hikes?: (MapHike | null)[];
   /** Optional photo markers (per-hike map). */
@@ -161,7 +161,7 @@ const config = {
     defaultBasemapId: string;
     lines: GeoJSON.Feature<GeoJSON.LineString>[];
     starts: ([number, number] | null)[];
-    bounds: [[number, number], [number, number]];
+    bounds: [[number, number], [number, number]] | null;
     hikes: (HikeMeta | null)[];
     photos: { lng: number; lat: number; thumb: string; full: string; caption?: string; index: number }[];
     reveal: boolean;
@@ -239,7 +239,10 @@ const config = {
 
     const fullLines: GeoJSON.FeatureCollection = {
       type: 'FeatureCollection',
-      features: cfg.lines.map((line, i) => ({ ...line, properties: { ...line.properties, idx: i } })),
+      features: cfg.lines.map((line, i) => ({
+        ...line,
+        properties: { ...line.properties, idx: i, slug: cfg.hikes[i]?.slug },
+      })),
     };
     const startFeatures = cfg.starts
       .map((s, i) =>
@@ -248,29 +251,36 @@ const config = {
           : null,
       )
       .filter((f): f is NonNullable<typeof f> => f !== null);
-    // Overview pins carry place/date for labels.
+    // Overview pins carry place/date for labels and slug for filtering.
     const pinFeatures = cfg.starts
       .map((s, i) =>
         s && cfg.hikes[i]
           ? {
               type: 'Feature' as const,
-              properties: { idx: i, title: cfg.hikes[i]!.title, date: cfg.hikes[i]!.date },
+              properties: { idx: i, slug: cfg.hikes[i]!.slug, title: cfg.hikes[i]!.title, date: cfg.hikes[i]!.date },
               geometry: { type: 'Point' as const, coordinates: s },
             }
           : null,
       )
       .filter((f): f is NonNullable<typeof f> => f !== null);
 
-    const map = new maplibregl.Map({
+    const mapOptions: maplibregl.MapOptions = {
       container: el,
       style: styleFor(initialId),
-      bounds: cfg.bounds,
-      // Overview reads as "where I've wandered": breathing room, not a tight fit.
-      fitBoundsOptions: cfg.overview
-        ? { padding: 80, maxZoom: 8, animate: false }
-        : { padding: 48, animate: false },
       attributionControl: { compact: true },
-    });
+    };
+    if (cfg.bounds) {
+      mapOptions.bounds = cfg.bounds;
+      // Overview reads as "where I've wandered": breathing room, not a tight fit.
+      mapOptions.fitBoundsOptions = cfg.overview
+        ? { padding: 80, maxZoom: 8, animate: false }
+        : { padding: 48, animate: false };
+    } else {
+      // No hikes yet: show an empty default view rather than nothing.
+      mapOptions.center = [12, 55];
+      mapOptions.zoom = 3;
+    }
+    const map = new maplibregl.Map(mapOptions);
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     if (cfg.basemaps.length > 1) {
       map.addControl(
@@ -469,6 +479,26 @@ const config = {
 
     // Expose for the page (lightbox fly-to, replay player).
     (el as any).__map = map;
+
+    // Live filter hook (index search): show only the given hike slugs, or all
+    // when passed null. Filters both the pins and the faint track lines; the
+    // clustered pin source recomputes clusters from the filtered set.
+    (el as any).__setHikeFilter = (slugs: Set<string> | null) => {
+      const pinsSrc = map.getSource('pins') as maplibregl.GeoJSONSource | undefined;
+      const tracksSrc = map.getSource('tracks') as maplibregl.GeoJSONSource | undefined;
+      if (pinsSrc) {
+        pinsSrc.setData({
+          type: 'FeatureCollection',
+          features: slugs ? pinFeatures.filter((f) => slugs.has(f.properties.slug)) : pinFeatures,
+        });
+      }
+      if (tracksSrc) {
+        tracksSrc.setData({
+          type: 'FeatureCollection',
+          features: slugs ? fullLines.features.filter((f) => slugs.has((f.properties as any)?.slug)) : fullLines.features,
+        });
+      }
+    };
   }
 
   const init = () => document.querySelectorAll<HTMLElement>('[data-map]').forEach(initMap);

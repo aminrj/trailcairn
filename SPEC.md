@@ -128,9 +128,17 @@ make the user notice the difference.
      cluster zooms to expand it). Pin labels use MapLibre collision detection — they show when
      there's room, otherwise just the pin.
    - Clicking a pin → popup card (title, date, distance) → links to the hike page.
-   - Below or beside the map: a **logbook list** of all hikes (reverse-chronological) and the
-     summary stats band (see §5).
-   - A search box (Pagefind) filtering the logbook by title/notes/tags/location.
+   - The overview map is the page's **permanent centerpiece** — always rendered (directly under
+     the title/stats), never removed or replaced. Vertical order: title → lifetime stats → search →
+     map → logbook. Even with no hikes yet, the (empty) map still shows, with the "copy
+     `_TEMPLATE`" hint beside/below it.
+   - Below the map: a **logbook list** of all hikes (reverse-chronological); the summary stats band
+     is above the map (see §5).
+   - A **search box filters in real time** — it sits above the map and filters *which pins appear on
+     the map* and which logbook cards show (by title/tags/location/date/summary). Clearing restores
+     all pins. A no-match search leaves the map visible (with no/fewer pins) and shows a small "no
+     matches" note by the logbook. (Implemented as a client-side filter so it works in dev too;
+     Pagefind remains the project's build-time full-text index per §1.)
    - Performance: many tracks must render via a **single GeoJSON source + line layer** (GPU),
      not one DOM marker per point. See §7.
 
