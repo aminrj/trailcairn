@@ -88,16 +88,37 @@ const config = {
     padding: 1rem;
     font-size: 0.9rem;
   }
-  /* Photo markers are small thumbnails (SPEC §6). */
+  /* Photo markers are small thumbnails (SPEC §6). Outer is positioned by
+     MapLibre; the inner holds the image so it can animate without fighting the
+     marker's translate transform. */
   :global(.photo-marker) {
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+    z-index: 1;
+  }
+  :global(.photo-marker-img) {
+    width: 100%;
+    height: 100%;
     border-radius: 50%;
     border: 2px solid #fff;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
     background-size: cover;
     background-position: center;
-    cursor: pointer;
+    background-color: #cdd3d0;
+    transition:
+      transform 0.25s ease,
+      box-shadow 0.25s ease;
+  }
+  /* Pop + glow as the replay marker passes this photo (reduced-motion gated by JS). */
+  :global(.photo-marker.is-passing) {
+    z-index: 5;
+  }
+  :global(.photo-marker.is-passing .photo-marker-img) {
+    transform: scale(1.7);
+    box-shadow:
+      0 0 0 3px rgba(192, 57, 43, 0.55),
+      0 3px 9px rgba(0, 0, 0, 0.5);
   }
   :global(.maplibregl-popup-content) {
     font-family: var(--font-body, sans-serif);
@@ -391,16 +412,23 @@ const config = {
         }
       }
 
+      const photoMarkerEls: { lng: number; lat: number; el: HTMLElement; index: number }[] = [];
       for (const photo of cfg.photos) {
         const node = document.createElement('div');
         node.className = 'photo-marker';
-        node.style.backgroundImage = `url("${photo.thumb}")`;
         node.title = photo.caption ?? '';
+        const img = document.createElement('div');
+        img.className = 'photo-marker-img';
+        img.style.backgroundImage = `url("${photo.thumb}")`;
+        node.appendChild(img);
         node.addEventListener('click', () => {
           el.dispatchEvent(new CustomEvent('photo-marker-click', { bubbles: true, detail: { index: photo.index } }));
         });
         new maplibregl.Marker({ element: node, anchor: 'center' }).setLngLat([photo.lng, photo.lat]).addTo(map);
+        photoMarkerEls.push({ lng: photo.lng, lat: photo.lat, el: node, index: photo.index });
       }
+      // Expose for the replay player (pass-by animation).
+      (el as any).__photoMarkers = photoMarkerEls;
 
       if (cfg.reveal && !prefersReducedMotion && cfg.lines.length === 1) {
         const coords = cfg.lines[0].geometry.coordinates;

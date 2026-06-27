@@ -200,6 +200,40 @@ const config = { mapId, coordinates, timeline, cumulativeKm, totalKm, durationSe
 
       if (reducedMotion) followInput.checked = false; // motion only on explicit play
 
+      // Photo markers come from the map island, which may create them slightly
+      // after this island initialises — so build the pass list lazily on first
+      // play. Each entry is the playback progress nearest that photo.
+      let passPhotos: { el: HTMLElement; p: number }[] | null = null;
+      function buildPassPhotos() {
+        const pm = ((mapEl as any).__photoMarkers ?? []) as { lng: number; lat: number; el: HTMLElement }[];
+        passPhotos = pm
+          .map((m) => {
+            let best = 0;
+            let bd = Infinity;
+            for (let i = 0; i <= lastIdx; i++) {
+              const dx = coordinates[i][0] - m.lng;
+              const dy = coordinates[i][1] - m.lat;
+              const d = dx * dx + dy * dy;
+              if (d < bd) {
+                bd = d;
+                best = i;
+              }
+            }
+            return { el: m.el, p: timeline[best] };
+          })
+          .sort((a, b) => a.p - b.p);
+      }
+
+      function firePasses(prev: number, cur: number) {
+        if (reducedMotion || prev === cur || !passPhotos) return;
+        for (const ph of passPhotos) {
+          if (prev < ph.p && cur >= ph.p) {
+            ph.el.classList.add('is-passing');
+            window.setTimeout(() => ph.el.classList.remove('is-passing'), 700);
+          }
+        }
+      }
+
       let progress = 0; // 0..1 of playback
       let playing = false;
       let speed = 1;
@@ -247,22 +281,23 @@ const config = { mapId, coordinates, timeline, cumulativeKm, totalKm, durationSe
 
       function frame(ts: number) {
         if (!playing) return;
+        const prev = progress;
         if (lastTs) progress += (ts - lastTs) / (BASE_MS / speed);
         lastTs = ts;
+        if (progress >= 1) progress = 1;
+        render(progress);
+        follow(progress);
+        firePasses(prev, progress);
         if (progress >= 1) {
-          progress = 1;
-          render(progress);
-          follow(progress);
           pause();
           return;
         }
-        render(progress);
-        follow(progress);
         raf = requestAnimationFrame(frame);
       }
 
       function play() {
         if (playing) return;
+        if (!passPhotos) buildPassPhotos();
         if (progress >= 1) progress = 0; // replay from start
         playing = true;
         lastTs = 0;

@@ -144,9 +144,10 @@ make the user notice the difference.
    - **Replay player** (added feature): a play/pause control animates a marker travelling the
      track over the GPX timeline (real per-point times where present, even spacing otherwise),
      with the elevation cursor moving in sync, a scrubber, speed control (1×/4×/16×), and an
-     optional "follow" toggle that pans the map. Self-contained island; reuses the precomputed
-     coordinates/timeline (no raw GPX shipped); reduced-motion-aware (no autoplay, motion only on
-     explicit play). See §7.
+     optional "follow" toggle that pans the map. As the marker passes a photo's location, that
+     photo marker pops/glows briefly. Self-contained island; reuses the precomputed
+     coordinates/timeline (no raw GPX shipped); reduced-motion-aware (no autoplay, pass/marker
+     motion only on explicit play). See §7.
    - The Markdown diary entry.
    - A photo gallery / lightbox; clicking a photo can pan the map to its marker (nice-to-have).
 
