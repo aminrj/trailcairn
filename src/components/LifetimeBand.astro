@@ -7,12 +7,10 @@ interface Props {
 const { stats } = Astro.props;
 const fmt = new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric' });
 
-const range =
-  stats.firstDate && stats.lastDate
-    ? stats.firstDate.getTime() === stats.lastDate.getTime()
-      ? fmt.format(stats.firstDate)
-      : `${fmt.format(stats.firstDate)} – ${fmt.format(stats.lastDate)}`
-    : '—';
+const first = stats.firstDate ? fmt.format(stats.firstDate) : null;
+const last = stats.lastDate ? fmt.format(stats.lastDate) : null;
+// Collapse to a single label when both ends fall in the same month/year.
+const range = first && last ? (first === last ? first : `${first} – ${last}`) : '—';
 
 const cells: { label: string; value: string }[] = [
   { label: 'Hikes', value: String(stats.hikeCount) },
