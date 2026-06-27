@@ -21,6 +21,18 @@
   box-sizing: border-box;
 }
 
+/* Respect reduced-motion globally; map/gallery JS also checks this (SPEC §7/§8). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 html {
   -webkit-text-size-adjust: 100%;
 }
@@ -110,6 +122,13 @@ a {
   border-radius: 10px;
   padding: 1.25rem 1.5rem;
   background: #fff;
+  transition:
+    border-color 0.18s ease,
+    transform 0.18s ease;
+}
+.hike-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
 }
 .hike-card h2 {
   margin: 0 0 0.25rem;

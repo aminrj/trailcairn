@@ -27,6 +27,8 @@ const lightboxData = photos.map((p, i) => ({
             <button class="gallery-item" data-index={i} aria-label={p.caption ?? `Photo ${i + 1}`}>
               <img
                 src={p.derivatives.thumb}
+                srcset={`${p.derivatives.thumb} 320w, ${p.derivatives.medium} 1000w`}
+                sizes="(max-width: 600px) 45vw, 200px"
                 width={p.width}
                 height={p.height}
                 loading="lazy"
@@ -173,6 +175,7 @@ const lightboxData = photos.map((p, i) => ({
 
     // Locate a map on the same page so opening a placed photo flies to it.
     const mapEl = document.querySelector<HTMLElement>('[data-map]');
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     function show(i: number) {
       current = (i + photos.length) % photos.length;
@@ -183,7 +186,9 @@ const lightboxData = photos.map((p, i) => ({
       lb.hidden = false;
       document.body.style.overflow = 'hidden';
       if (p.placed && p.lng != null && p.lat != null && mapEl && (mapEl as any).__map) {
-        (mapEl as any).__map.flyTo({ center: [p.lng, p.lat], zoom: 14, speed: 0.8 });
+        const map = (mapEl as any).__map;
+        if (reducedMotion) map.jumpTo({ center: [p.lng, p.lat], zoom: 14 });
+        else map.flyTo({ center: [p.lng, p.lat], zoom: 14, speed: 0.8 });
       }
     }
     function close() {
