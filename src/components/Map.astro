@@ -422,24 +422,6 @@ const config = {
         }
       }
 
-      const photoMarkerEls: { lng: number; lat: number; el: HTMLElement; index: number }[] = [];
-      for (const photo of cfg.photos) {
-        const node = document.createElement('div');
-        node.className = 'photo-marker';
-        node.title = photo.caption ?? '';
-        const img = document.createElement('div');
-        img.className = 'photo-marker-img';
-        img.style.backgroundImage = `url("${photo.thumb}")`;
-        node.appendChild(img);
-        node.addEventListener('click', () => {
-          el.dispatchEvent(new CustomEvent('photo-marker-click', { bubbles: true, detail: { index: photo.index } }));
-        });
-        new maplibregl.Marker({ element: node, anchor: 'center' }).setLngLat([photo.lng, photo.lat]).addTo(map);
-        photoMarkerEls.push({ lng: photo.lng, lat: photo.lat, el: node, index: photo.index });
-      }
-      // Expose for the replay player (pass-by animation).
-      (el as any).__photoMarkers = photoMarkerEls;
-
       if (cfg.reveal && !prefersReducedMotion && cfg.lines.length === 1) {
         const coords = cfg.lines[0].geometry.coordinates;
         const source = map.getSource('tracks') as maplibregl.GeoJSONSource;
@@ -463,6 +445,36 @@ const config = {
       }
     };
 
+    // Photo markers are HTML markers (for thumbnail styling + the replay pop),
+    // kept independent of the style. Created once, then re-attached on every
+    // style load so they're robust to setStyle / re-init and never clobbered by
+    // the popup, reveal, replay or filter code. Marker.addTo() does remove+add,
+    // so re-calling is idempotent and the element refs stay stable for replay.
+    let photoMarkers: maplibregl.Marker[] | null = null;
+    const ensurePhotoMarkers = () => {
+      if (!photoMarkers) {
+        photoMarkers = [];
+        const exposed: { lng: number; lat: number; el: HTMLElement; index: number }[] = [];
+        for (const photo of cfg.photos) {
+          const node = document.createElement('div');
+          node.className = 'photo-marker';
+          node.title = photo.caption ?? '';
+          const img = document.createElement('div');
+          img.className = 'photo-marker-img';
+          img.style.backgroundImage = `url("${photo.thumb}")`;
+          node.appendChild(img);
+          node.addEventListener('click', () => {
+            el.dispatchEvent(new CustomEvent('photo-marker-click', { bubbles: true, detail: { index: photo.index } }));
+          });
+          photoMarkers.push(new maplibregl.Marker({ element: node, anchor: 'center' }).setLngLat([photo.lng, photo.lat]));
+          exposed.push({ lng: photo.lng, lat: photo.lat, el: node, index: photo.index });
+        }
+        // Expose for the replay player (pass-by animation).
+        (el as any).__photoMarkers = exposed;
+      }
+      for (const m of photoMarkers) m.addTo(map);
+    };
+
     let interactionsReady = false;
     // style.load fires on first load and after every setStyle().
     map.on('style.load', async () => {
@@ -471,6 +483,7 @@ const config = {
         if (!map.hasImage('hike-pin')) map.addImage('hike-pin', pinImg, { pixelRatio: 2 });
       }
       addOverlayLayers();
+      ensurePhotoMarkers(); // every style load, so they survive basemap switches
       if (!interactionsReady) {
         interactionsReady = true;
         addInteractions();
