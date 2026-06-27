@@ -1,6 +1,6 @@
 ---
 import type { Feature, LineString } from 'geojson';
-import { DEFAULT_BASEMAP_STYLE } from '../lib/map';
+import { ENABLED_BASEMAPS, DEFAULT_BASEMAP_ID } from '../lib/map';
 
 export interface MapPhoto {
   lng: number;
@@ -48,7 +48,16 @@ const {
   height = '60vh',
 } = Astro.props;
 
-const config = { style: DEFAULT_BASEMAP_STYLE, lines, starts, bounds, hikes, photos, reveal };
+const config = {
+  basemaps: ENABLED_BASEMAPS.map((b) => ({ id: b.id, label: b.label, style: b.style })),
+  defaultBasemapId: DEFAULT_BASEMAP_ID,
+  lines,
+  starts,
+  bounds,
+  hikes,
+  photos,
+  reveal,
+};
 ---
 
 <div class="maplibre-map" id={id} data-map style={`--map-height:${height}`}>
@@ -87,14 +96,40 @@ const config = { style: DEFAULT_BASEMAP_STYLE, lines, starts, bounds, hikes, pho
     font-family: var(--font-body, sans-serif);
     font-size: 0.85rem;
   }
+  /* Basemap switcher control. */
+  :global(.basemap-switch) {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    background: rgba(255, 255, 255, 0.92);
+    border-radius: 6px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  }
+  :global(.basemap-switch button) {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.7rem;
+    letter-spacing: 0.02em;
+    border: 0;
+    background: none;
+    color: #444;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  :global(.basemap-switch button[aria-pressed='true']) {
+    background: var(--accent, #3f6b4d);
+    color: #fff;
+  }
 </style>
 
 <script>
   import maplibregl from 'maplibre-gl';
   import 'maplibre-gl/dist/maplibre-gl.css';
 
+  type BasemapDef = { id: string; label: string; style: string | maplibregl.StyleSpecification };
   type Cfg = {
-    style: string | maplibregl.StyleSpecification;
+    basemaps: BasemapDef[];
+    defaultBasemapId: string;
     lines: GeoJSON.Feature<GeoJSON.LineString>[];
     starts: ([number, number] | null)[];
     bounds: [[number, number], [number, number]];
@@ -104,6 +139,42 @@ const config = { style: DEFAULT_BASEMAP_STYLE, lines, starts, bounds, hikes, pho
   };
 
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const BASEMAP_KEY = 'trailcairn:basemap';
+
+  // Small basemap switcher control (terrain / topo / satellite). Unobtrusive
+  // segmented buttons; the choice is remembered for the session.
+  class BasemapControl {
+    _container!: HTMLElement;
+    constructor(
+      private basemaps: BasemapDef[],
+      private currentId: string,
+      private onSelect: (id: string) => void,
+    ) {}
+    onAdd() {
+      const c = document.createElement('div');
+      c.className = 'maplibregl-ctrl basemap-switch';
+      for (const b of this.basemaps) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = b.label;
+        btn.setAttribute('aria-pressed', String(b.id === this.currentId));
+        btn.addEventListener('click', () => {
+          if (b.id === this.currentId) return;
+          this.currentId = b.id;
+          c.querySelectorAll('button').forEach((x) =>
+            x.setAttribute('aria-pressed', String(x.textContent === b.label)),
+          );
+          this.onSelect(b.id);
+        });
+        c.appendChild(btn);
+      }
+      this._container = c;
+      return c;
+    }
+    onRemove() {
+      this._container.remove();
+    }
+  }
 
   function initMap(el: HTMLElement) {
     if (el.dataset.mapReady) return;
@@ -112,56 +183,75 @@ const config = { style: DEFAULT_BASEMAP_STYLE, lines, starts, bounds, hikes, pho
     if (!cfgEl?.textContent) return;
     const cfg: Cfg = JSON.parse(cfgEl.textContent);
 
+    const ids = cfg.basemaps.map((b) => b.id);
+    const styleFor = (id: string) => cfg.basemaps.find((b) => b.id === id)!.style;
+    let stored: string | null = null;
+    try {
+      stored = sessionStorage.getItem(BASEMAP_KEY);
+    } catch {}
+    const initialId = stored && ids.includes(stored) ? stored : cfg.defaultBasemapId;
+
+    const fullLines: GeoJSON.FeatureCollection = {
+      type: 'FeatureCollection',
+      features: cfg.lines.map((line, i) => ({ ...line, properties: { ...line.properties, idx: i } })),
+    };
+    const startFeatures = cfg.starts
+      .map((s, i) =>
+        s
+          ? { type: 'Feature' as const, properties: { idx: i }, geometry: { type: 'Point' as const, coordinates: s } }
+          : null,
+      )
+      .filter((f): f is NonNullable<typeof f> => f !== null);
+
     const map = new maplibregl.Map({
       container: el,
-      style: cfg.style,
+      style: styleFor(initialId),
       bounds: cfg.bounds,
       fitBoundsOptions: { padding: 48, animate: false },
       attributionControl: { compact: true },
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+    if (cfg.basemaps.length > 1) {
+      map.addControl(
+        new BasemapControl(cfg.basemaps, initialId, (id) => {
+          try {
+            sessionStorage.setItem(BASEMAP_KEY, id);
+          } catch {}
+          // Full reload so raster↔vector basemaps swap cleanly; overlays are
+          // re-added on the resulting style.load.
+          map.setStyle(styleFor(id), { diff: false });
+        }),
+        'top-left',
+      );
+    }
 
-    map.on('load', () => {
-      const fullLines: GeoJSON.FeatureCollection = {
-        type: 'FeatureCollection',
-        features: cfg.lines.map((line, i) => ({ ...line, properties: { ...line.properties, idx: i } })),
-      };
-
-      map.addSource('tracks', { type: 'geojson', data: fullLines, lineMetrics: true });
-      map.addLayer({
-        id: 'tracks-line',
-        type: 'line',
-        source: 'tracks',
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#c0392b', 'line-width': 3.5, 'line-opacity': 0.9 },
-      });
-
-      const startFeatures = cfg.starts
-        .map((s, i) =>
-          s
-            ? { type: 'Feature' as const, properties: { idx: i }, geometry: { type: 'Point' as const, coordinates: s } }
-            : null,
-        )
-        .filter((f): f is NonNullable<typeof f> => f !== null);
-      if (startFeatures.length) {
-        map.addSource('starts', {
-          type: 'geojson',
-          data: { type: 'FeatureCollection', features: startFeatures },
+    // Track + start-pin sources/layers. Re-added on every style load because
+    // setStyle() clears non-basemap sources/layers.
+    const addOverlayLayers = () => {
+      if (!map.getSource('tracks')) {
+        map.addSource('tracks', { type: 'geojson', data: fullLines, lineMetrics: true });
+        map.addLayer({
+          id: 'tracks-line',
+          type: 'line',
+          source: 'tracks',
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: { 'line-color': '#c0392b', 'line-width': 3.5, 'line-opacity': 0.9 },
         });
+      }
+      if (startFeatures.length && !map.getSource('starts')) {
+        map.addSource('starts', { type: 'geojson', data: { type: 'FeatureCollection', features: startFeatures } });
         map.addLayer({
           id: 'starts-circle',
           type: 'circle',
           source: 'starts',
-          paint: {
-            'circle-radius': 6,
-            'circle-color': '#3f6b4d',
-            'circle-stroke-color': '#fff',
-            'circle-stroke-width': 2,
-          },
+          paint: { 'circle-radius': 6, 'circle-color': '#3f6b4d', 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 },
         });
       }
+    };
 
-      // Index popups: clicking a track or start pin opens a small card → hike page.
+    // One-time: click popups, photo markers, line reveal. Layer click handlers
+    // and HTML markers persist across setStyle, so register them once.
+    const addInteractions = () => {
       if (cfg.hikes.length) {
         const openPopup = (idx: number, lngLat: maplibregl.LngLatLike) => {
           const hike = cfg.hikes[idx];
@@ -176,33 +266,23 @@ const config = { style: DEFAULT_BASEMAP_STYLE, lines, starts, bounds, hikes, pho
             .addTo(map);
         };
         for (const layer of ['tracks-line', 'starts-circle']) {
-          if (!map.getLayer(layer)) continue;
-          map.on('click', layer, (e) => {
-            const idx = (e.features?.[0]?.properties?.idx as number) ?? 0;
-            openPopup(idx, e.lngLat);
-          });
+          map.on('click', layer, (e) => openPopup((e.features?.[0]?.properties?.idx as number) ?? 0, e.lngLat));
           map.on('mouseenter', layer, () => (map.getCanvas().style.cursor = 'pointer'));
           map.on('mouseleave', layer, () => (map.getCanvas().style.cursor = ''));
         }
       }
 
-      // Photo markers (per-hike map). HTML thumbnail markers; clicking opens the lightbox.
       for (const photo of cfg.photos) {
         const node = document.createElement('div');
         node.className = 'photo-marker';
         node.style.backgroundImage = `url("${photo.thumb}")`;
         node.title = photo.caption ?? '';
         node.addEventListener('click', () => {
-          el.dispatchEvent(
-            new CustomEvent('photo-marker-click', { bubbles: true, detail: { index: photo.index } }),
-          );
+          el.dispatchEvent(new CustomEvent('photo-marker-click', { bubbles: true, detail: { index: photo.index } }));
         });
-        new maplibregl.Marker({ element: node, anchor: 'center' })
-          .setLngLat([photo.lng, photo.lat])
-          .addTo(map);
+        new maplibregl.Marker({ element: node, anchor: 'center' }).setLngLat([photo.lng, photo.lat]).addTo(map);
       }
 
-      // Subtle line-draw reveal on single-track pages (SPEC §7), reduced-motion aware.
       if (cfg.reveal && !prefersReducedMotion && cfg.lines.length === 1) {
         const coords = cfg.lines[0].geometry.coordinates;
         const source = map.getSource('tracks') as maplibregl.GeoJSONSource;
@@ -213,23 +293,30 @@ const config = { style: DEFAULT_BASEMAP_STYLE, lines, starts, bounds, hikes, pho
           const count = Math.max(2, Math.floor(t * coords.length));
           source.setData({
             type: 'FeatureCollection',
-            features: [
-              { type: 'Feature', properties: { idx: 0 }, geometry: { type: 'LineString', coordinates: coords.slice(0, count) } },
-            ],
+            features: [{ type: 'Feature', properties: { idx: 0 }, geometry: { type: 'LineString', coordinates: coords.slice(0, count) } }],
           });
           if (t < 1) requestAnimationFrame(step);
           else source.setData(fullLines);
         };
-        // begin from an empty-ish line
         source.setData({
           type: 'FeatureCollection',
           features: [{ type: 'Feature', properties: { idx: 0 }, geometry: { type: 'LineString', coordinates: coords.slice(0, 2) } }],
         });
         requestAnimationFrame(step);
       }
+    };
+
+    let interactionsReady = false;
+    // style.load fires on first load and after every setStyle().
+    map.on('style.load', () => {
+      addOverlayLayers();
+      if (!interactionsReady) {
+        interactionsReady = true;
+        addInteractions();
+      }
     });
 
-    // Expose for the page (lightbox ↔ map fly-to wiring).
+    // Expose for the page (lightbox fly-to, replay player).
     (el as any).__map = map;
   }
 
