@@ -15,6 +15,9 @@ function rasterStyle(opts: {
 }): StyleSpecification {
   return {
     version: 8,
+    // Glyphs so runtime-added symbol layers (the overview pin labels) render
+    // even on these raster basemaps. Keyless (OpenFreeMap font server).
+    glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
     sources: {
       basemap: {
         type: 'raster',
