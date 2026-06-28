@@ -324,11 +324,12 @@ when many photos sit close together so the map doesn't choke.
   - `genUrl()` in `lib/photos.ts` is the single URL source: production → `${PHOTO_BASE_URL}/<slug>/
     <file>` (R2), local dev → `/_gen/photos/<slug>/<file>` off disk.
   - **The metadata bridge:** because the deployed (Cloudflare) build clones a text-only repo
-    without the photos, a local build writes a committed `photos.manifest.json` per hike (placement,
-    dimensions, blur, caption, source). The deployed build reads it as the source of truth and emits
+    without the photos, **`npm run photos`** (render-independent, covers drafts too) writes a
+    committed `photos.manifest.json` per hike (placement, dimensions, blur, caption, source) plus
+    the WebP derivatives. The deployed build reads the manifest as the source of truth and emits
     R2 URLs. The manifest stores no URLs, so dev and prod can't diverge. `npm run validate` flags a
     stale manifest. **Contract:** the R2 key a derivative is uploaded to must exactly equal the URL
-    the build emits — `<slug>/<base>-<size>.webp`. See `R2-PHOTOS.md`.
+    the build emits — `<slug>/<base>-<size>.webp`. See `R2-PHOTOS.md` and `DEPLOY.md`.
 
 ---
 
@@ -363,6 +364,7 @@ when many photos sit close together so the map doesn't choke.
       stats.ts              # lifetime aggregation
     styles/
   scripts/
+    photos.mjs              # npm run photos (derivatives + photos.manifest.json)
     validate.mjs            # npm run validate
 ```
 

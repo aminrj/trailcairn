@@ -129,13 +129,18 @@ resizes from. They do NOT go to git or R2 (the *derivatives* go to R2).
 > Photos web download. (Web downloads can hide EXIF in a spot some readers miss; the build now
 > recovers it from the embedded block, but originals are still the safe bet.)
 
-### 2. Build — generates the WebP derivatives AND the manifest
+### 2. Generate the WebP derivatives AND the manifest
 ```bash
-npm run build
+npm run photos
 ```
 This writes `public/_gen/photos/2026-07-skuleskogen/*.webp` (the files you upload) and
-`src/content/hikes/2026-07-skuleskogen/photos.manifest.json` (the text you commit). Run
-`npm run validate` too — it flags a stale manifest before you push.
+`src/content/hikes/2026-07-skuleskogen/photos.manifest.json` (the text you commit) — for **every**
+hike, draft or published. Then `npm run validate` to confirm 0 errors and no stale-manifest warning.
+
+> Why `npm run photos` and not `npm run build`? `astro build` skips drafts, so it would never write
+> a manifest for a hike you're still drafting. `npm run photos` is render-independent — it processes
+> every hike folder directly, so the manifest is always ready before you publish. (`npm run build`
+> still refreshes published hikes' manifests as a side effect; `npm run photos` is the reliable one.)
 
 ### 3. Upload that hike's **derivatives** to R2
 `copy` (adds/updates only, never deletes — safe), only the `.webp`, into a prefix that **exactly
@@ -166,8 +171,9 @@ git checkout main && git merge dev && git push      # → hikes.aminrj.com updat
 git checkout dev
 ```
 
-**Loop in one line:** `npm run build` → `rclone copy` the derivatives → `git add -f` the text +
-manifest → preview → merge to main.
+**Loop in one line:** `npm run photos` → `rclone copy` the derivatives → `git add -f` the text +
+manifest → push to `main`. (If the live site doesn't update, see "Deploy troubleshooting" in
+`DEPLOY.md` — usually it's an old cached page on the custom domain or a Retry rebuilding an old commit.)
 
 ### Worked example (one real photo, end to end)
 Hike folder `src/content/hikes/2026-06-Dals-Ed/`, photo `photos/IMG_0820.HEIC`:

@@ -8,6 +8,7 @@
     "start": "astro dev",
     "build": "astro build && pagefind --site dist",
     "preview": "astro preview",
+    "photos": "tsx scripts/photos.mjs",
     "validate": "tsx scripts/validate.mjs",
     "astro": "astro"
   },

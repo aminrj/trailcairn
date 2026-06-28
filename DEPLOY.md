@@ -161,36 +161,49 @@ npm run dev          # open http://localhost:4321
 
 Check the new hike: track on the map, stats, photos placed, diary reads well. For search,
 `npm run build && npm run preview`. Fix anything, including switching `status: draft → published`
-when the entry is ready to be public.
+when the entry is ready to be public. (No `status:` line at all = published — that's the default.)
 
 Run the safety check before publishing:
 
 ```bash
-npm run validate     # flags missing fields, broken GPX, timezone skew on photos
+npm run validate     # flags missing fields, broken GPX, timezone skew, and a stale/missing manifest
 ```
 
 ### B5. Publish
 
-Photos live in **Cloudflare R2**, not git (see `R2-PHOTOS.md`). So publishing is: build (makes the
-WebP derivatives + the `photos.manifest.json` metadata bridge) → push the derivatives to R2 → commit
-the **text + manifest** (never the photos) → merge.
+Photos live in **Cloudflare R2**, not git (see `R2-PHOTOS.md`). The publish ritual is four moves —
+**generate → upload pixels → commit text → go live**:
 
 ```bash
-# on dev branch:
-npm run build                                       # writes public/_gen derivatives + photos.manifest.json
-rclone copy -v public/_gen/photos/2026-07-skuleskogen \
-            r2:trailcairn-photos/2026-07-skuleskogen --include "*.webp"   # pixels → R2
+SLUG=2026-07-skuleskogen        # your hike's folder name (lowercase = the URL slug = the R2 prefix)
 
-git add -f src/content/hikes/2026-07-skuleskogen/index.md \
-           src/content/hikes/2026-07-skuleskogen/track.gpx \
-           src/content/hikes/2026-07-skuleskogen/photos.manifest.json     # text + manifest ONLY
+# 1. Generate the WebP derivatives + photos.manifest.json for every hike (draft or not).
+npm run photos
+npm run validate                # confirm 0 errors and no "manifest is stale" warning
+
+# 2. Upload THIS hike's derivatives (the .webp the build wrote) to R2.
+rclone copy -v public/_gen/photos/$SLUG r2:trailcairn-photos/$SLUG --include "*.webp"
+
+# 3. Commit ONLY the text (Markdown + GPX + manifest). NOT the photos.
+git add -f src/content/hikes/$SLUG/index.md \
+           src/content/hikes/$SLUG/*.gpx \
+           src/content/hikes/$SLUG/photos.manifest.json
 git commit -m "Add Skuleskogen ridge hike"
-git push                                            # builds a preview
 
-# when ready to go live:
-git checkout main && git merge dev && git push      # → hikes.aminrj.com updates
-git checkout dev
+# 4. Go live.
+git push                        # to main → Cloudflare auto-deploys (~2 min)
 ```
+
+> Working on a `dev` branch instead? Same first three steps, then `git push` (preview build), and
+> when happy `git checkout main && git merge dev && git push && git checkout dev`. Either way, the
+> push to **`main`** is what updates `hikes.aminrj.com`.
+
+**Two mistakes to avoid (both bit us once):**
+- **Don't `git add -f` the whole folder** (`src/content/hikes/$SLUG`). That pulls the photos into
+  git — exactly what R2 exists to prevent. Add the *three text paths* explicitly, as above.
+- **Don't forget `index.md`.** A hike with its `.gpx`/manifest committed but no `index.md` simply
+  won't appear (no content entry). After committing, sanity-check:
+  `git ls-files src/content/hikes/$SLUG/` should list `index.md`, the `.gpx`, and `photos.manifest.json`.
 
 Within ~2 minutes the hike is live. Done. (Full R2 details, the slug↔key contract, and a worked
 example are in `R2-PHOTOS.md`.)
@@ -217,13 +230,64 @@ example are in `R2-PHOTOS.md`.)
   portable to any other tool. Nothing about your history is locked to Cloudflare, Astro, or
   this codebase.
 
-## If something breaks in 10 years
+## Deploy troubleshooting (every problem we actually hit, and the fix)
 
-- **Build fails on Cloudflare:** check the build log in the Pages dashboard. Usually a Node
-  version bump — update `NODE_VERSION`. Pin dependency versions in `package.json` to reduce
-  this.
-- **Site up but a hike looks wrong:** run `npm run validate` locally on that hike.
-- **Forgot the workflow:** re-read Part B. It's always the same five steps.
+Work top to bottom — the checks are ordered from most to least common.
+
+### 1. New hikes don't appear on the live site
+First find out **which commit Cloudflare built** and **how many pages**. Pages dashboard →
+Deployments → open the latest one → build log. Look for two lines:
+```
+HEAD is now at <sha> <message>          ← must be your LATEST commit
+[build] N page(s) built                 ← must be 2 (index + about) PLUS one per published hike
+```
+- **`N` is just 2** → the built commit contains no hikes. Either the hike text isn't committed, or
+  Cloudflare built an old commit (next item). Verify locally: `git ls-files src/content/hikes/<slug>/`
+  must show `index.md`. If `index.md` is missing, commit it (`git add -f .../index.md`) and push.
+- **`HEAD is at an OLD sha`** (not your latest) → see items 2 and 3.
+
+### 2. Cloudflare keeps re-building an OLD commit
+**"Retry deployment" rebuilds that deployment's original commit — not your latest.** Retrying the
+old empty deployment will forever rebuild the old empty commit. To build the newest commit:
+- Push any commit to `main` (a normal push, or `git commit --allow-empty -m "redeploy" && git push`), **or**
+- Pages → Deployments → **Create deployment** → branch `main` (builds the branch HEAD).
+
+Confirm GitHub actually has your commit first: `git ls-remote origin main` should equal your local
+`git rev-parse main`. If local is ahead, you forgot to `git push`.
+
+### 3. "This project is disconnected from your Git account"
+The GitHub ↔ Cloudflare link dropped (it can expire on its own). While disconnected, **pushes don't
+trigger builds**, so the site freezes on the last commit it saw.
+- Pages → project → **Settings → Build/Git** → **Reconnect to Git**, re-authorize the Cloudflare
+  GitHub app, grant the `trailcairn` repo.
+- Then trigger a build per item 2 (a fresh push, since the webhook for earlier pushes was lost).
+
+### 4. `*.pages.dev` shows the new site but `hikes.aminrj.com` shows the OLD one
+This is **edge caching on the `aminrj.com` zone**, not a deploy problem. A private/incognito tab
+does **not** help — it bypasses your browser cache, not Cloudflare's edge cache. Diagnose:
+```bash
+curl -sI https://hikes.aminrj.com/ | grep -i 'cf-cache-status\|age\|last-modified'
+#   cf-cache-status: HIT + a large age = stale edge copy
+```
+Fix now: Cloudflare → **`aminrj.com` zone → Caching → Configuration → Purge Everything** (or Custom
+Purge the two URLs). Prevent recurrence: that zone has a **Page Rule / Cache Rule caching HTML** for
+`hikes.aminrj.com` / `trails.aminrj.com` — scope it to exclude them or delete it, and let Pages
+manage caching (it already fingerprints JS/CSS/images and revalidates HTML).
+
+### 5. Hikes appear, but their photos are broken / missing
+Photos come from R2 via the committed manifest. So:
+- **Whole gallery empty though the page builds** → `photos.manifest.json` is missing or stale. Run
+  `npm run photos` (regenerates it for every hike, draft or not), then re-commit it. `npm run validate`
+  warns when a manifest is stale.
+- **Individual images 404** → the derivative isn't in R2 at the matching key. You uploaded originals
+  instead of `public/_gen` derivatives, missed the `rclone copy` for that hike, or a slug/case
+  mismatch. Compare the `<img>` URL with `rclone lsf r2:trailcairn-photos/<slug>/` and re-upload.
+  Full contract + worked example in `R2-PHOTOS.md`.
+
+### 6. Build fails on Cloudflare
+Check the build log. Usually a Node bump — set `NODE_VERSION` in the Pages env vars to current LTS,
+and pin dependency versions in `package.json`. A hike-specific failure: run `npm run validate` and
+`npm run build` locally to reproduce.
 
 ## Footnote: if you specifically want tagged/versioned releases
 

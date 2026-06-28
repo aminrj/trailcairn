@@ -13,7 +13,8 @@ npm install
 npm run dev        # http://localhost:4321
 npm run build      # static output in dist/ (also builds the search index)
 npm run preview    # serve the production build locally
-npm run validate   # health-check every hike folder
+npm run photos     # generate WebP derivatives + photos.manifest.json for every hike (before publishing)
+npm run validate   # health-check every hike folder (flags a stale/missing manifest)
 ```
 
 A fresh clone works out of the box: the bundled example hike (`src/content/hikes/_example/`)
@@ -124,11 +125,12 @@ folder for dev. Everything routes through one helper, `genUrl()` in
 - **Production build** emits `${PHOTO_BASE_URL}/<hike-slug>/<derivative>.webp` (R2).
 
 Because the deployed (Cloudflare) build clones a **text-only** repo without the photos, it can't
-recompute placement/dimensions/blur. So a local build writes a small committed
-`photos.manifest.json` next to each hike's `index.md` (the metadata bridge); the deployed build
-reads it and emits R2 URLs. **You upload the generated WebP derivatives** (`public/_gen/photos/<slug>/`),
-not the originals — see [`R2-PHOTOS.md`](./R2-PHOTOS.md) for the exact `rclone` command and the
-per-hike publish ritual. `npm run validate` flags a stale manifest.
+recompute placement/dimensions/blur. So **`npm run photos`** writes a small committed
+`photos.manifest.json` next to each hike's `index.md` (the metadata bridge) and the WebP
+derivatives under `public/_gen/photos/<slug>/`; the deployed build reads the manifest and emits R2
+URLs. **You upload the generated WebP derivatives** (not the originals) to R2 — see
+[`R2-PHOTOS.md`](./R2-PHOTOS.md) for the exact `rclone` command and the per-hike publish ritual,
+and [`DEPLOY.md`](./DEPLOY.md) for deploy troubleshooting. `npm run validate` flags a stale manifest.
 
 ## Configuration
 
@@ -167,6 +169,7 @@ src/
   lib/                            # gpx.ts, photos.ts, stats.ts, hikes.ts, map.ts
   pages/                          # index, hikes/[slug], about
 scripts/
+  photos.mjs                      # npm run photos — derivatives + photos.manifest.json for every hike
   validate.mjs                    # npm run validate
 public/_gen/                      # generated image derivatives (gitignored, rebuilt on build)
 ```
