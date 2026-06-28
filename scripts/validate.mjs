@@ -131,47 +131,69 @@ async function validateHike(slug) {
       if (!files.includes(key)) warnings.push(`_photos.json references missing photo: ${key}`);
     }
 
-    let withGps = 0;
-    let withTime = 0;
+    // Mirror the build's placement decision: override → on-trail EXIF GPS →
+    // timestamp match → unplaced. Reports placed vs unplaced and names the
+    // photos you'd need to hand-pin.
+    const tz = gpx ? resolveHikeTimeZone({ lat: gpx.start[1], lng: gpx.start[0], frontmatterTz: data.timezone }) : null;
+    let onTrail = () => true;
+    if (gpx) {
+      const [[minLng, minLat], [maxLng, maxLat]] = gpx.bounds;
+      const latPad = Math.max((maxLat - minLat) * 0.5, 0.025);
+      const lngPad = Math.max((maxLng - minLng) * 0.5, 0.04);
+      onTrail = (la, ln) => la >= minLat - latPad && la <= maxLat + latPad && ln >= minLng - lngPad && ln <= maxLng + lngPad;
+    }
+
+    let placed = 0;
     let pinned = 0;
-    let unplaceable = 0;
-    let fallbackOffset = 0;
+    const offTrail = []; // had GPS, but off-trail (home/pre-hike) → not placed
+    const unplaceable = []; // no GPS and no timestamp match → genuinely unplaceable
     const gaps = [];
 
     for (const f of files) {
       const ov = overrides[f] ?? {};
-      const exif = await inspectPhotoExif(path.join(photosDir, f));
-      if (exif.hasGps) withGps++;
-      if (exif.hasTime) withTime++;
-      if (exif.offsetSource === 'fallback') fallbackOffset++;
-      const manuallyPinned = ov.lat != null && ov.lng != null;
-      if (manuallyPinned) pinned++;
+      const exif = await inspectPhotoExif(path.join(photosDir, f), tz?.id);
+      const manualPin = ov.lat != null && ov.lng != null;
+      if (manualPin) pinned++;
 
-      if (!exif.hasTime || !gpx) {
-        // can't time-match; only unplaceable if also no GPS and not pinned/suppressed
-        if (!exif.hasGps && !manuallyPinned && ov.place !== false) unplaceable++;
-      } else {
+      let didPlace = false;
+      if (ov.place === false) {
+        // intentionally suppressed
+      } else if (manualPin) {
+        didPlace = true;
+      } else if (exif.hasGps && onTrail(exif.lat, exif.lng)) {
+        didPlace = true;
+      } else if (exif.epochMs != null && gpx) {
         const m = matchPhotoToTrack(exif.epochMs, gpx);
-        if (m) gaps.push(m.gapMin);
+        // Only photos relying on timestamp (no GPS at all) inform the timezone
+        // heuristic; off-trail GPS photos legitimately have far-off times.
+        if (m && !exif.hasGps) gaps.push(m.gapMin);
+        if (m && m.gapMin <= MAX_MATCH_GAP_MINUTES) didPlace = true;
       }
+
+      if (didPlace) placed++;
+      else if (ov.place === false) {
+        /* intentional, don't flag */
+      } else if (exif.hasGps) offTrail.push(f); // has a location, just not on this trail
+      else unplaceable.push(f);
     }
 
     notes.push(
-      `photos: ${files.length} · ${withGps} GPS · ${withTime} timestamped · ${pinned} pinned`,
+      `photos: ${files.length} · ${placed} placed · ${offTrail.length + unplaceable.length} unplaced` +
+        (pinned ? ` · ${pinned} pinned` : ''),
     );
-    if (unplaceable > 0)
-      warnings.push(`${unplaceable} photo(s) have no GPS/timestamp and no manual pin → unplaced`);
+    if (offTrail.length)
+      notes.push(`off-trail GPS (home/pre-hike, not placed): ${offTrail.join(', ')}`);
+    if (unplaceable.length)
+      warnings.push(`unplaceable (no GPS, no timestamp match) — hand-pin via _photos.json if wanted: ${unplaceable.join(', ')}`);
 
-    // Timezone-skew heuristic: if timestamp-matched photos sit consistently far
-    // from the track in time, the offset is probably wrong (SPEC §6).
+    // Timezone-skew heuristic: timestamp-matched photos consistently far from the
+    // track in time suggests a wrong offset (SPEC §6).
     if (gaps.length > 0) {
       const sorted = [...gaps].sort((a, b) => a - b);
       const median = sorted[Math.floor(sorted.length / 2)];
       if (median > MAX_MATCH_GAP_MINUTES) {
         warnings.push(
-          `photo↔track time gap looks large (median ${Math.round(median)} min` +
-            (fallbackOffset > 0 ? `, ${fallbackOffset} photo(s) using fallback offset` : '') +
-            ') — check PHOTO_UTC_OFFSET_HOURS / timezone',
+          `photo↔track time gap looks large (median ${Math.round(median)} min) — check timezone / PHOTO_UTC_OFFSET_HOURS`,
         );
       }
     }
