@@ -5,6 +5,11 @@ dist/
 
 # Generated responsive image derivatives (rebuilt from originals on build)
 public/_gen/
+
+# Generated photo manifest — committed per *published* hike via `git add -f`
+# (it's the R2 metadata bridge). Ignored by default so the bundled example and
+# unpublished hikes don't churn.
+photos.manifest.json
 .env
 .env.*
 !.env.example

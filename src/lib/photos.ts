@@ -5,6 +5,7 @@ import sharp from 'sharp';
 import heicConvert from 'heic-convert';
 import type { GpxData } from './gpx';
 import { zoneOffsetMinutes } from './timezone';
+import { PHOTO_BASE_URL } from '../consts';
 
 // NOTE: this module deliberately has no `astro:content` dependency so the
 // standalone validate script (plain Node via tsx) can reuse its EXIF logic.
@@ -31,12 +32,18 @@ const QUALITY: Record<SizeName, number> = { thumb: 70, medium: 78, full: 80 };
 const PHOTO_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif']);
 const HEIC_EXTS = new Set(['.heic', '.heif']);
 
-// Derivatives are written under public/ so they're served in dev and copied to
-// dist on build. All URL construction goes through genUrl() — the single seam
-// for swapping in object storage later (SPEC §10).
+// Derivatives are written under public/ so dev can serve them from disk. All
+// URL construction goes through genUrl() — the single seam for photo storage
+// (SPEC §8/§10):
+//   - production build → R2 at `${PHOTO_BASE_URL}/<slug>/<file>`
+//   - local dev        → `/_gen/photos/<slug>/<file>` (served off disk)
+// `IS_PROD` is true during `astro build` and false during `astro dev`; in the
+// standalone validate script (tsx) it's false, which is fine — validate checks
+// local files, it doesn't emit served URLs.
 const GEN_ROOT = path.resolve('public/_gen/photos');
+const IS_PROD = process.env.NODE_ENV === 'production';
 function genUrl(slug: string, file: string): string {
-  return `/_gen/photos/${slug}/${file}`;
+  return IS_PROD ? `${PHOTO_BASE_URL}/${slug}/${file}` : `/_gen/photos/${slug}/${file}`;
 }
 
 // Per-hike image cache: lets us skip the (slow) HEIC decode + resize when the
@@ -445,7 +452,17 @@ export interface HikeCover {
 export async function getHikeCover(input: HikePhotoInput): Promise<HikeCover | null> {
   const photosDir = path.join(input.dir, 'photos');
   const files = listPhotoFiles(photosDir);
-  if (files.length === 0) return null;
+
+  // Deployed build path: no local photos → read the cover from the manifest.
+  if (files.length === 0) {
+    const manifest = readManifest(input.dir);
+    if (!manifest || manifest.photos.length === 0) return null;
+    const photos = manifest.photos.map((m) => photoFromManifest(input.slug, m));
+    const cover = pickCover(photos, input.cover);
+    if (!cover) return null;
+    return { thumb: cover.derivatives.thumb, medium: cover.derivatives.medium, blur: cover.blur, width: cover.width, height: cover.height };
+  }
+
   let coverFile = files[0];
   if (input.cover) {
     const name = path.basename(input.cover);
@@ -461,12 +478,116 @@ export async function getHikeCover(input: HikePhotoInput): Promise<HikeCover | n
   }
 }
 
+// --- committed photo manifest ----------------------------------------------
+
+// The manifest is the metadata bridge for deploys where the original photos
+// aren't in git (R2 storage, SPEC §8/§10). A LOCAL build (photos present)
+// computes placement/dimensions/blur and writes this small JSON next to the
+// hike's index.md; it is committed as text. The DEPLOYED build (no photos)
+// reads it as the source of truth and emits R2 URLs via genUrl(). Derivative
+// URLs are NOT stored — they're reconstructed from the filename so the same
+// manifest yields local URLs in dev and R2 URLs in prod.
+const MANIFEST_VERSION = 1;
+
+interface ManifestPhoto {
+  filename: string;
+  width: number;
+  height: number;
+  blur: string;
+  caption: string | null;
+  order: number;
+  placed: boolean;
+  lat: number | null;
+  lng: number | null;
+  source: PlacementSource;
+}
+interface PhotoManifest {
+  version: number;
+  photos: ManifestPhoto[];
+}
+
+function manifestPath(dir: string): string {
+  return path.join(dir, 'photos.manifest.json');
+}
+function readManifest(dir: string): PhotoManifest | null {
+  try {
+    const m = JSON.parse(fs.readFileSync(manifestPath(dir), 'utf-8')) as PhotoManifest;
+    return Array.isArray(m?.photos) ? m : null;
+  } catch {
+    return null;
+  }
+}
+/** Deterministic write (stable order, no timestamps), skipped when unchanged. */
+function writeManifest(dir: string, photos: ProcessedPhoto[]): void {
+  const manifest: PhotoManifest = {
+    version: MANIFEST_VERSION,
+    photos: photos
+      .map((p) => ({
+        filename: p.filename,
+        width: p.width,
+        height: p.height,
+        blur: p.blur,
+        caption: p.caption,
+        order: p.order,
+        placed: p.placed,
+        lat: p.lat,
+        lng: p.lng,
+        source: p.source,
+      }))
+      .sort((a, b) => a.filename.localeCompare(b.filename, undefined, { numeric: true })),
+  };
+  const json = JSON.stringify(manifest, null, 2) + '\n';
+  try {
+    if (fs.existsSync(manifestPath(dir)) && fs.readFileSync(manifestPath(dir), 'utf-8') === json) return;
+    fs.writeFileSync(manifestPath(dir), json);
+  } catch {
+    /* best-effort */
+  }
+}
+/** Rebuild a ProcessedPhoto from a manifest entry (deployed build, no photos). */
+function photoFromManifest(slug: string, m: ManifestPhoto): ProcessedPhoto {
+  const base = path.parse(m.filename).name;
+  return {
+    filename: m.filename,
+    caption: m.caption,
+    order: m.order,
+    placed: m.placed,
+    lat: m.lat,
+    lng: m.lng,
+    source: m.source,
+    width: m.width,
+    height: m.height,
+    blur: m.blur,
+    derivatives: derivativeUrls(slug, base),
+    diagnostics: {
+      hadExifGps: m.source === 'exif-gps',
+      hadExifTime: m.source === 'timestamp',
+      exifOffsetSource: 'none',
+      matchGapMinutes: null,
+      gpsOffTrail: false,
+    },
+  };
+}
+
+/** Cover = frontmatter `cover` (by filename) else the first photo. */
+function pickCover(photos: ProcessedPhoto[], coverField?: string | null): ProcessedPhoto | null {
+  let cover: ProcessedPhoto | null = photos[0] ?? null;
+  if (coverField) {
+    const coverName = path.basename(coverField);
+    cover = photos.find((p) => p.filename === coverName) ?? cover;
+  }
+  return cover;
+}
+
 // --- main -------------------------------------------------------------------
 
 /**
- * Process all photos for a hike: read EXIF (incl. HEIC), place each photo
- * (override → EXIF GPS → timestamp match → unplaced), generate responsive
- * WebP derivatives + a blur-up placeholder, and apply `_photos.json` overrides.
+ * Process all photos for a hike. Two source paths that must not diverge:
+ *  - **local photos present** (dev, and the LOCAL production build): read EXIF,
+ *    place each photo (override → on-trail GPS → timestamp → unplaced), generate
+ *    WebP derivatives + blur, and (re)write the committed manifest.
+ *  - **no local photos** (the deployed Cloudflare build): read the committed
+ *    manifest and reconstruct, emitting R2 URLs via genUrl().
  * Never throws on a bad individual photo — it's skipped with diagnostics.
  */
 export async function processHikePhotos(
@@ -477,6 +598,16 @@ export async function processHikePhotos(
   const photosDir = path.join(dir, 'photos');
   const overrides = readOverrides(photosDir);
   const files = listPhotoFiles(photosDir);
+
+  // Deployed build path: no local photos → reconstruct from the committed manifest.
+  if (files.length === 0) {
+    const manifest = readManifest(dir);
+    if (!manifest) return { photos: [], cover: null };
+    const photos = manifest.photos
+      .map((m) => photoFromManifest(slug, m))
+      .sort((a, b) => a.order - b.order || a.filename.localeCompare(b.filename, undefined, { numeric: true }));
+    return { photos, cover: pickCover(photos, coverField) };
+  }
 
   const photos: ProcessedPhoto[] = [];
   const cache = readImageCache(slug);
@@ -581,12 +712,9 @@ export async function processHikePhotos(
   // Order: explicit `order` first, then filename order (stable).
   photos.sort((a, b) => a.order - b.order || a.filename.localeCompare(b.filename, undefined, { numeric: true }));
 
-  // Cover: frontmatter cover (matched by filename) else first photo.
-  let cover: ProcessedPhoto | null = photos[0] ?? null;
-  if (coverField) {
-    const coverName = path.basename(coverField);
-    cover = photos.find((p) => p.filename === coverName) ?? cover;
-  }
+  // Freeze the metadata bridge so the deployed (photo-less) build can reproduce
+  // exactly what we computed here.
+  writeManifest(dir, photos);
 
-  return { photos, cover };
+  return { photos, cover: pickCover(photos, coverField) };
 }
