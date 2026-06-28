@@ -117,6 +117,8 @@ export interface ProcessedPhoto {
     hadExifTime: boolean;
     exifOffsetSource: 'exif' | 'fallback' | 'none';
     matchGapMinutes: number | null;
+    /** EXIF GPS present but well outside the track area (e.g. taken at home). */
+    gpsOffTrail: boolean;
   };
 }
 
@@ -270,27 +272,80 @@ async function ensureDerivative(
   return genUrl(slug, file);
 }
 
+const TIME_PICK = ['DateTimeOriginal', 'OffsetTimeOriginal', 'CreateDate', 'OffsetTime'];
+
+/** Offsets of embedded TIFF/EXIF headers (big- and little-endian) in a buffer. */
+function tiffHeaderOffsets(buf: Buffer): number[] {
+  const offs: number[] = [];
+  for (const marker of ['MM\x00\x2a', 'II\x2a\x00']) {
+    const mb = Buffer.from(marker, 'latin1');
+    let i = 0;
+    while ((i = buf.indexOf(mb, i)) !== -1 && offs.length < 24) {
+      offs.push(i);
+      i += 1;
+    }
+  }
+  return offs.sort((a, b) => a - b);
+}
+
+/**
+ * Recover EXIF from an embedded TIFF block when exifr can't read the container
+ * directly. This is the case for some HEICs (e.g. certain Google Photos
+ * downloads): the full EXIF — GPS *and* timestamp — is intact in a TIFF block
+ * that exifr's HEIF reader doesn't locate. We find the TIFF header and parse it
+ * as a standalone TIFF. Returns real EXIF tags (not a regex guess), or null.
+ */
+async function recoverEmbeddedExif(
+  buf: Buffer,
+): Promise<{ gps?: { latitude?: number; longitude?: number }; timeData?: Record<string, unknown> } | null> {
+  for (const off of tiffHeaderOffsets(buf)) {
+    const slice = buf.subarray(off);
+    try {
+      // A revived parse to validate the block and read GPS; a raw parse for the
+      // datetime strings (kept consistent with the normal timezone handling).
+      const probe = await exifr.parse(slice, { tiff: true, ifd0: true, exif: true, gps: true });
+      if (!probe || (probe.latitude == null && probe.DateTimeOriginal == null && probe.Make == null)) continue;
+      const timeData = await exifr.parse(slice, { tiff: true, ifd0: true, exif: true, reviveValues: false, pick: TIME_PICK });
+      return {
+        gps: probe.latitude != null ? { latitude: probe.latitude, longitude: probe.longitude } : undefined,
+        timeData: timeData ?? undefined,
+      };
+    } catch {
+      /* not a usable TIFF here — try the next candidate */
+    }
+  }
+  return null;
+}
+
 /**
  * Read placement-relevant EXIF from a photo's original bytes (HEIC + JPEG).
- * Never throws — returns "nothing found" on any read error. Used by both the
- * build pipeline and the validate script.
+ * Falls back to recovering an embedded TIFF block when the container parse finds
+ * nothing (HEICs exifr can't read). Never throws. Used by the build + validate.
  */
 export async function inspectPhotoExif(absPath: string, zoneId?: string | null): Promise<PhotoExif> {
+  const buf = fs.readFileSync(absPath);
   let gps: { latitude?: number; longitude?: number } | undefined;
   let timeData: Record<string, unknown> | undefined;
   try {
-    gps = await exifr.gps(fs.readFileSync(absPath));
+    gps = await exifr.gps(buf);
   } catch {
     gps = undefined;
   }
   try {
-    timeData = await exifr.parse(fs.readFileSync(absPath), {
-      reviveValues: false,
-      pick: ['DateTimeOriginal', 'OffsetTimeOriginal', 'CreateDate', 'OffsetTime'],
-    });
+    timeData = await exifr.parse(buf, { reviveValues: false, pick: TIME_PICK });
   } catch {
     timeData = undefined;
   }
+
+  // Recovery path: nothing found via the container → look for an embedded TIFF.
+  if ((gps?.latitude == null || gps?.longitude == null) && timeData?.DateTimeOriginal == null) {
+    const recovered = await recoverEmbeddedExif(buf);
+    if (recovered) {
+      if (gps?.latitude == null) gps = recovered.gps ?? gps;
+      if (timeData?.DateTimeOriginal == null) timeData = recovered.timeData ?? timeData;
+    }
+  }
+
   const hasGps = gps?.latitude != null && gps?.longitude != null;
   const dtRaw = (timeData?.DateTimeOriginal ?? timeData?.CreateDate) as string | undefined;
   const offRaw = (timeData?.OffsetTimeOriginal ?? timeData?.OffsetTime) as string | undefined;
@@ -428,6 +483,19 @@ export async function processHikePhotos(
   let cacheDirty = false;
   let coldDecodes = 0;
 
+  // On-trail filter: a GPS photo only earns a marker if its coordinates fall
+  // within the (padded) track bounds. This keeps home/pre-hike photos — which
+  // legitimately carry GPS — from dropping a marker far off the trail and
+  // leaking home coordinates (SPEC §6). Manual _photos.json pins bypass this.
+  let onTrail: (lat: number, lng: number) => boolean = () => true;
+  if (gpx) {
+    const [[minLng, minLat], [maxLng, maxLat]] = gpx.bounds;
+    const latPad = Math.max((maxLat - minLat) * 0.5, 0.025);
+    const lngPad = Math.max((maxLng - minLng) * 0.5, 0.04);
+    onTrail = (la, ln) =>
+      la >= minLat - latPad && la <= maxLat + latPad && ln >= minLng - lngPad && ln <= maxLng + lngPad;
+  }
+
   for (const filename of files) {
     const absPath = path.join(photosDir, filename);
     const ov = overrides[filename] ?? {};
@@ -444,11 +512,12 @@ export async function processHikePhotos(
       // The hike's timezone resolves EXIF local-without-zone timestamps.
       const exif = await inspectPhotoExif(absPath, input.timezone);
 
-      // Placement priority: override → EXIF GPS → timestamp → unplaced.
+      // Placement priority: override → on-trail EXIF GPS → timestamp → unplaced.
       let lat: number | null = null;
       let lng: number | null = null;
       let source: PlacementSource = 'unplaced';
       let matchGapMinutes: number | null = null;
+      let gpsOffTrail = false;
 
       if (ov.place === false) {
         source = 'unplaced';
@@ -456,11 +525,13 @@ export async function processHikePhotos(
         lat = ov.lat;
         lng = ov.lng;
         source = 'override';
-      } else if (exif.hasGps) {
+      } else if (exif.hasGps && onTrail(exif.lat!, exif.lng!)) {
         lat = exif.lat;
         lng = exif.lng;
         source = 'exif-gps';
       } else if (exif.epochMs != null && gpx) {
+        // GPS missing or off-trail → fall back to matching the EXIF time to the
+        // nearest trackpoint (this result is on the track by construction).
         const match = nearestTrackpoint(exif.epochMs, gpx);
         if (match && match.gapMin <= MAX_MATCH_GAP_MIN) {
           lat = match.lat;
@@ -471,6 +542,8 @@ export async function processHikePhotos(
           matchGapMinutes = Math.round(match.gapMin); // too far → leave unplaced, report gap
         }
       }
+      // Note an off-trail GPS photo we deliberately didn't place (for validate).
+      if (source !== 'override' && exif.hasGps && !onTrail(exif.lat!, exif.lng!)) gpsOffTrail = true;
 
       photos.push({
         filename,
@@ -489,6 +562,7 @@ export async function processHikePhotos(
           hadExifTime: exif.hasTime,
           exifOffsetSource: exif.offsetSource,
           matchGapMinutes,
+          gpsOffTrail,
         },
       });
     } catch {

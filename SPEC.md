@@ -232,13 +232,24 @@ sensibly (km to 1 decimal, metres to integer).
 Each photo should appear as a marker at the point on the track where it was taken. Algorithm,
 at build time, per photo:
 
-1. **If the photo has EXIF GPS** → use those coordinates directly.
+1. **If the photo has EXIF GPS that falls within (or near) the track area** → use those
+   coordinates directly. **On-trail filter:** GPS that lies well outside the padded track bounds
+   (e.g. a pre-hike photo taken at home, which still carries GPS) is **not** placed — it would drop
+   a marker off the trail and leak home coordinates (privacy, §6). Such photos fall through to the
+   timestamp step and are otherwise left unplaced (a manual pin overrides this).
 2. **Else, if the photo has an EXIF timestamp AND the GPX has per-point timestamps** → place the
-   photo at the trackpoint whose time is nearest the photo's capture time (interpolate between
-   the two nearest points if you want sub-point accuracy; nearest-point is acceptable for v1).
-   This is the key feature — it lets GPS-less photos still land in the right place by time.
+   photo at the trackpoint whose time is nearest the photo's capture time (the result is on the
+   track by construction). This lets GPS-less photos land in the right place by time.
 3. **Else** → photo is **unplaced**: still show it in the gallery, just no map marker. Never
    error out over a missing timestamp.
+
+**EXIF recovery (HEIC):** some HEICs — notably certain Google Photos downloads — keep their full
+EXIF (GPS *and* timestamp) in a TIFF block that the EXIF library can't locate via the HEIF
+container, so a naive read reports "no metadata". Before giving up, the reader scans for the
+embedded TIFF header and parses it as a standalone TIFF, recovering the real GPS/timestamp tags
+(not a regex guess). This is what lets these photos place automatically rather than falling to
+"unplaced". `npm run validate` lists, per hike, the photos that still can't be placed (and which
+carry off-trail/home GPS) so they can be hand-pinned if wanted.
 
 **Manual override:** an optional `photos/_photos.json` can specify, per filename, an explicit
 `{ lat, lng }`, a caption, an explicit ordering, or `place: false` to suppress a marker.
