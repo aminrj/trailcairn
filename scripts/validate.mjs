@@ -197,6 +197,33 @@ async function validateHike(slug) {
         );
       }
     }
+
+    // --- photo manifest drift (the R2 deploy bridge, SPEC §8/§10) ---
+    // The deployed build reads photos.manifest.json instead of the photos. If
+    // the manifest is stale, photos silently 404 on the live site — so guard it.
+    const isPublished = (data.status ?? 'published') !== 'draft';
+    let manifest = null;
+    try {
+      manifest = JSON.parse(fs.readFileSync(path.join(dir, 'photos.manifest.json'), 'utf-8'));
+    } catch {
+      /* none */
+    }
+    if (!manifest) {
+      if (isPublished && files.length > 0)
+        warnings.push('no photos.manifest.json — run `npm run build` so the R2 deploy has photo metadata');
+    } else {
+      const manifestNames = new Set((manifest.photos ?? []).map((p) => p.filename));
+      const missingInManifest = files.filter((f) => !manifestNames.has(f));
+      const missingOnDisk = [...manifestNames].filter((n) => !files.includes(n));
+      if (missingInManifest.length)
+        warnings.push(
+          `manifest is stale — photo(s) not in photos.manifest.json (rebuild: \`npm run build\`): ${missingInManifest.join(', ')}`,
+        );
+      if (missingOnDisk.length)
+        warnings.push(
+          `manifest is stale — lists photo(s) no longer on disk (rebuild: \`npm run build\`): ${missingOnDisk.join(', ')}`,
+        );
+    }
   } else if (!data.cover) {
     notes.push('no photos/ folder');
   }
