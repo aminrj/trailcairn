@@ -114,13 +114,31 @@ Per-hike pages also have a **replay player**: press play to send a marker along 
 recorded timeline, with the elevation cursor in sync, a scrubber, speed (1×/4×/16×), and a follow
 toggle.
 
+## Photo storage (R2)
+
+Photos are served from **Cloudflare R2** in production while the originals stay in the local hike
+folder for dev. Everything routes through one helper, `genUrl()` in
+[`src/lib/photos.ts`](./src/lib/photos.ts):
+
+- **`npm run dev`** serves derivatives from `public/_gen/` on disk — no R2 needed to preview.
+- **Production build** emits `${PHOTO_BASE_URL}/<hike-slug>/<derivative>.webp` (R2).
+
+Because the deployed (Cloudflare) build clones a **text-only** repo without the photos, it can't
+recompute placement/dimensions/blur. So a local build writes a small committed
+`photos.manifest.json` next to each hike's `index.md` (the metadata bridge); the deployed build
+reads it and emits R2 URLs. **You upload the generated WebP derivatives** (`public/_gen/photos/<slug>/`),
+not the originals — see [`R2-PHOTOS.md`](./R2-PHOTOS.md) for the exact `rclone` command and the
+per-hike publish ritual. `npm run validate` flags a stale manifest.
+
 ## Configuration
 
-Copy `.env.example` to `.env`. Both settings optional:
+Copy `.env.example` to `.env`. All settings optional:
 
 - `MAP_STYLE_URL` — overrides the default topo basemap (single config point); swap in a self-hosted
   style without touching code.
 - `PHOTO_UTC_OFFSET_HOURS` — fallback timezone offset for photo placement (see above).
+- `PHOTO_BASE_URL` — base URL for photos in production (R2 custom domain); default
+  `https://photos.aminrj.com`.
 
 ## Deploy (Cloudflare Pages)
 
@@ -128,10 +146,12 @@ The build output is a plain static `dist/` with no serverless functions.
 
 - **Build command:** `npm run build`
 - **Output directory:** `dist`
-- **Environment variables:** set `MAP_STYLE_URL` (and `PHOTO_UTC_OFFSET_HOURS` if needed).
+- **Environment variables:** set `MAP_STYLE_URL`, `PHOTO_BASE_URL` (and `PHOTO_UTC_OFFSET_HOURS` if
+  needed).
 
 `npm run build` runs Astro and then Pagefind to generate the search index into `dist/`. Drafts are
-excluded from production builds.
+excluded from production builds. Per-hike photo upload to R2 is a separate local step — see
+[`R2-PHOTOS.md`](./R2-PHOTOS.md) and [`DEPLOY.md`](./DEPLOY.md).
 
 ## Project layout
 

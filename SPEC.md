@@ -317,9 +317,18 @@ when many photos sit close together so the map doesn't choke.
 - Serve modern formats (WebP/AVIF) with fallbacks; lazy-load below-the-fold images.
 - Generate low-quality placeholders (blur-up) for smooth perceived loading.
 - Strip GPS EXIF from public derivatives (see §6 privacy).
-- Originals stay in the repo's `photos/` dirs **for v1 local development only**. Note in the
-  README that this is fine locally but that for a large lifetime archive the originals should
-  move to object storage (R2) later — that's a documented seam (§10), not a v1 task.
+- Originals stay in the local `photos/` dirs for build-time metadata (EXIF/placement) and local
+  dev preview. **Serving has moved to object storage (the §10 seam is now realized):**
+  - Derivatives are generated locally at build into `public/_gen/photos/<slug>/` and **uploaded to
+    Cloudflare R2**; the repo stays text-only for published hikes (no photo bytes in git).
+  - `genUrl()` in `lib/photos.ts` is the single URL source: production → `${PHOTO_BASE_URL}/<slug>/
+    <file>` (R2), local dev → `/_gen/photos/<slug>/<file>` off disk.
+  - **The metadata bridge:** because the deployed (Cloudflare) build clones a text-only repo
+    without the photos, a local build writes a committed `photos.manifest.json` per hike (placement,
+    dimensions, blur, caption, source). The deployed build reads it as the source of truth and emits
+    R2 URLs. The manifest stores no URLs, so dev and prod can't diverge. `npm run validate` flags a
+    stale manifest. **Contract:** the R2 key a derivative is uploaded to must exactly equal the URL
+    the build emits — `<slug>/<base>-<size>.webp`. See `R2-PHOTOS.md`.
 
 ---
 
@@ -363,8 +372,11 @@ when many photos sit close together so the map doesn't choke.
 
 Leave these easy to add later; do not implement now:
 
-- **Object storage for photos (Cloudflare R2 / MinIO):** keep all photo URL generation behind one
-  helper so the source can change from local files to a CDN base URL without touching templates.
+- **Object storage for photos (Cloudflare R2 / MinIO): _now implemented_** — photo URLs route
+  through one helper (`genUrl()`), derivatives are served from R2 in production, and a committed
+  `photos.manifest.json` carries the metadata to the photo-less deployed build. Because it's
+  S3-compatible behind a single helper + base URL, swapping R2 for MinIO or another CDN stays a
+  config change. See §8 and `R2-PHOTOS.md`.
 - **Place-name / geo search (Nominatim):** Pagefind covers text search in v1. If geo search is
   added later it's a separate service; keep the search UI componentised so a second search mode
   can slot in.
