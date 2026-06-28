@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "photos": [
+    {
+      "filename": "IMG_0777.HEIC",
+      "width": 5712,
+      "height": 4284,
+      "blur": "data:image/webp;base64,UklGRlYAAABXRUJQVlA4IEoAAADQAQCdASoQAAwAA4BaJZAAAm4Gkv9nAAD+MUDiB6pK/m6UIZNNJ2gtFDibcfJnmCXxsBpRQnWlyq1Y0tzpFTg51xbo39PKavIcAA==",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": false,
+      "lat": null,
+      "lng": null,
+      "source": "unplaced"
+    },
+    {
+      "filename": "IMG_0779.HEIC",
+      "width": 5712,
+      "height": 4284,
+      "blur": "data:image/webp;base64,UklGRlgAAABXRUJQVlA4IEwAAAAQAgCdASoQAAwAA4BaJaQAD5Awbzu0HEAAAPjlyTW6xvBqA0dKCcNmWwAk936x+38wfNKXqamWbg/PZaz72MKY53G0QdWpm3e4gxQA",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": false,
+      "lat": null,
+      "lng": null,
+      "source": "unplaced"
+    },
+    {
+      "filename": "IMG_0783.HEIC",
+      "width": 5712,
+      "height": 4284,
+      "blur": "data:image/webp;base64,UklGRmAAAABXRUJQVlA4IFQAAACQAQCdASoQAAwAA4BaJZQAAcTVzUAA3fBGgEOFDC+Tmmh74lUhUCZtNAeJwWt7qdzcPDzf6X7GsxbgRQhO0QxNHWBVvacuhuw8Pn0sqMzWV0cAAAA=",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 58.72889722222222,
+      "lng": 14.569102777777777,
+      "source": "exif-gps"
+    },
+    {
+      "filename": "IMG_0785.HEIC",
+      "width": 4284,
+      "height": 5712,
+      "blur": "data:image/webp;base64,UklGRpwAAABXRUJQVlA4IJAAAAAwBACdASoQABUAPu1iqU2ppaOiMAgBMB2JZQDE2Bl5rWf+8w7Lrt0OE8AA38slEcqnSbw9DpPY1L70NA0SvPZb1n6XDAy+VZ6VzS05Vbl/vQLx/EpPundAcCabqX4XYqWimyp+ol/UCtLy3MOIVMsqofrpTKd/HjHhqro2mhZ1hiGRJfWCg9J6Sp/BgUlkAAA=",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 58.72881944444445,
+      "lng": 14.569183333333333,
+      "source": "exif-gps"
+    },
+    {
+      "filename": "IMG_0786.HEIC",
+      "width": 5712,
+      "height": 4284,
+      "blur": "data:image/webp;base64,UklGRlAAAABXRUJQVlA4IEQAAACwAQCdASoQAAwAA4BaJZAAAujRtgdAAP7iOmWmBlQGmGXNWaZ6e/DRMjKhyXgyxj1AzikNcexaCY8EWsU1e2VMwwAAAA==",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 58.715763888888894,
+      "lng": 14.59238611111111,
+      "source": "exif-gps"
+    },
+    {
+      "filename": "IMG_7380.JPG",
+      "width": 4032,
+      "height": 3024,
+      "blur": "data:image/webp;base64,UklGRnYAAABXRUJQVlA4IGoAAAAwBACdASoQABUAPu1iqU2ppaQiMAgBMB2JaACdLoAAP2Hi9MnUn4qFf4AA+dJrtEey1PZ7dlRi0lqjJFq28/Zk/d1FzKoBF7KQbR6kUY6fPOu8OpsGc5QWsDMhXYwRFnXMDqrAEMcLdbAA",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": false,
+      "lat": null,
+      "lng": null,
+      "source": "unplaced"
+    },
+    {
+      "filename": "IMG_7382.JPG",
+      "width": 4032,
+      "height": 3024,
+      "blur": "data:image/webp;base64,UklGRoQAAABXRUJQVlA4IHgAAAAwBACdASoQABUAPu1iqU2ppaOiMAgBMB2JagCdMoACq0hqcLHZm4/fPLAA/sVjj1iBaUVWFBZKeIKcqgJ16kZrpaw1/YCuQuvj3KNZcuDII64NXlSoXGYaUwHC7ERUB+j4hLJXxDIivzhzkQHiGQ5FKscmM7AAAAA=",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": false,
+      "lat": null,
+      "lng": null,
+      "source": "unplaced"
+    },
+    {
+      "filename": "IMG_7501.JPG",
+      "width": 4032,
+      "height": 3024,
+      "blur": "data:image/webp;base64,UklGRnAAAABXRUJQVlA4IGQAAAAQBACdASoQABUAPu1kqk4ppaQiMAgBMB2JQBOmUABfIokyxUxEnmEogAD+j6IjbClsIsYmgfg4QAHe+pi+oJJz4pUTorbW5ifSVvSvW0/evconNv9FUt2swNWW/qXQMSUr80AA",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": false,
+      "lat": null,
+      "lng": null,
+      "source": "unplaced"
+    },
+    {
+      "filename": "IMG_7505.JPG",
+      "width": 5712,
+      "height": 4284,
+      "blur": "data:image/webp;base64,UklGRmoAAABXRUJQVlA4IF4AAACwAwCdASoQABUAPu1iqU2ppaQiMAgBMB2JZQDDNB9b/FNilIEaUADwwIj/54/L8tWk8B1SbIVfkDsmAsEwOm6xgMZMNH2HqH931cVMg98B0cDXjl9slDwRWscPsAAA",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": false,
+      "lat": null,
+      "lng": null,
+      "source": "unplaced"
+    },
+    {
+      "filename": "IMG_7509.JPG",
+      "width": 4032,
+      "height": 3024,
+      "blur": "data:image/webp;base64,UklGRoQAAABXRUJQVlA4IHgAAABwBACdASoQABUAPu1iqU2ppaOiMAgBMB2JZgCdMoMljEovI10yG2yF5oXuPAD+xWz9lGE4VZNcr0Nl4Gjxj/za4J3uYpq/DRcqk0ixzZ7wj3z4K2uihyvGegkpdfOvGjJhvZVLJG+sUXAYHV21auauCNS+h3LgWAA=",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 58.72853888888889,
+      "lng": 14.566936111111112,
+      "source": "exif-gps"
+    },
+    {
+      "filename": "IMG_7513.JPG",
+      "width": 5712,
+      "height": 4284,
+      "blur": "data:image/webp;base64,UklGRo4AAABXRUJQVlA4IIIAAADwAwCdASoQABUAPu1iqU2ppaOiMAgBMB2JYgAATpoBVzV0Nj9MMDwAAPP/0qzG2DQfc2LQ9MXWwqfcFSNxUGhZe3Mtxp0cno3GCa5lPcEjReezFK098Teo09Wq3I65Nqok6TEze2/5wAoi+AOeFluYiou8norODBXQ4OzoL1IMAAAA",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 58.73312777777778,
+      "lng": 14.576175,
+      "source": "exif-gps"
+    }
+  ]
+}
