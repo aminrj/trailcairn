@@ -1,0 +1,173 @@
+{
+  "version": 1,
+  "photos": [
+    {
+      "filename": "20200815_075017.jpg",
+      "width": 4000,
+      "height": 3000,
+      "blur": "data:image/webp;base64,UklGRlAAAABXRUJQVlA4IEQAAAAQAgCdASoQAAwAA4BaJYgCdAEe4dfHZ/OwAM2g8qhlBatUthaLkamF5UgQ1YTwoWBmDgnJxHlTgMMCZEmGqrf9GAMgAA==",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 31.139470590278506,
+      "lng": -7.840870600193739,
+      "source": "timestamp"
+    },
+    {
+      "filename": "20200815_075024.jpg",
+      "width": 4000,
+      "height": 3000,
+      "blur": "data:image/webp;base64,UklGRkgAAABXRUJQVlA4IDwAAAAQAgCdASoQAAwAA4BaJYwCdH8AFk9HeGUAAPzZHbOj1HoCCUoD0UGDydwDByEUqeWX44M0vqNrEdJcAAA=",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 31.139470925554633,
+      "lng": -7.8408698458224535,
+      "source": "timestamp"
+    },
+    {
+      "filename": "20200815_084257.jpg",
+      "width": 4000,
+      "height": 3000,
+      "blur": "data:image/webp;base64,UklGRloAAABXRUJQVlA4IE4AAABQAgCdASoQAAwAA4BaJQBOjXAAWV8BjjUTZMAA/tckgP2HPKZ3+MUq7yD+2xaJgQj4apM1m8LCsX/BvhQPrSbL6SsFDOKmSwQCo/AAAAA=",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 31.13533948548138,
+      "lng": -7.835533255711198,
+      "source": "timestamp"
+    },
+    {
+      "filename": "20200815_084302.jpg",
+      "width": 4000,
+      "height": 3000,
+      "blur": "data:image/webp;base64,UklGRmIAAABXRUJQVlA4IFYAAADwAQCdASoQAAwAA4BaJYgCdAEM0nOM3iIA/pFzj1kLJlM9xwUooaw73aOZt/obFS+nCKk5UOXCOhCSBgNIeynikXR1/Mu1ziGZxdQ7O7QE5x5TaaOAAA==",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 31.135335126891732,
+      "lng": -7.83552847802639,
+      "source": "timestamp"
+    },
+    {
+      "filename": "20200815_084307.jpg",
+      "width": 4000,
+      "height": 3000,
+      "blur": "data:image/webp;base64,UklGRlYAAABXRUJQVlA4IEoAAAAwAgCdASoQAAwAA4BaJZACdGuAAs0RhDnT5AD+W38zvenqwRNRhOcnSg1ukOFy5C5u3OSKKhpQQSboB6t8L07Evsm0Z6Kr18AAAA==",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 31.135335126891732,
+      "lng": -7.83552847802639,
+      "source": "timestamp"
+    },
+    {
+      "filename": "20200815_102431.jpg",
+      "width": 4000,
+      "height": 3000,
+      "blur": "data:image/webp;base64,UklGRlQAAABXRUJQVlA4IEgAAACwAQCdASoQAAwAA4BaJZgCdADbL4oAAP6zQ8SZXEGvs+HskJeZny4nQ/IF+BiGwDab9lw778UemxA0ELFz3CVGWUeL1KoAAAA=",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 31.13100042566657,
+      "lng": -7.827065773308277,
+      "source": "timestamp"
+    },
+    {
+      "filename": "20200815_102442.jpg",
+      "width": 4000,
+      "height": 3000,
+      "blur": "data:image/webp;base64,UklGRlwAAABXRUJQVlA4IFAAAADwAQCdASoQAAwAA4BaJbACdADv39rRmNgA/qad55Zp1bSUHFqzrLVtvp+L6dg41fe+S5DRGy15yp04XOL6uwBcA9GLsiNpbClQoZHSbIAAAA==",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 31.13100042566657,
+      "lng": -7.827065773308277,
+      "source": "timestamp"
+    },
+    {
+      "filename": "20200815_113014.jpg",
+      "width": 4000,
+      "height": 3000,
+      "blur": "data:image/webp;base64,UklGRk4AAABXRUJQVlA4IEIAAAAQAgCdASoQAAwAA4BaJYgCdADMFIRzxa8AAP2TK2X3xE42Eid2YB7mKHs87cXK+DPqGpvbr4QLesBWFV+YFeZIAAA=",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 31.126340003684163,
+      "lng": -7.8262693248689175,
+      "source": "timestamp"
+    },
+    {
+      "filename": "20200815_115832.jpg",
+      "width": 4000,
+      "height": 3000,
+      "blur": "data:image/webp;base64,UklGRlwAAABXRUJQVlA4IFAAAAAQAgCdASoQAAwAA4BaJZACdAEWeu/hvtUwAP1x/N5Ek+DVc+cpJWqZh29jLT7E4PmH1pizWRWbOcooFgK5EOvdvEK0oxozWRFTZcvE80QAAA==",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 31.123755192384124,
+      "lng": -7.822924526408315,
+      "source": "timestamp"
+    },
+    {
+      "filename": "20200815_115836.jpg",
+      "width": 4000,
+      "height": 3000,
+      "blur": "data:image/webp;base64,UklGRmIAAABXRUJQVlA4IFYAAADwAQCdASoQAAwAA4BaJZACdAD2OkLLoxAA/ZT/N/Ex5RyDejc6corO23apALAxXX6jrkVttNmjMIBEU5yKVn+6aC2SCfp6xz6/68SG4ms9fel9eAAAAA==",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 31.123755192384124,
+      "lng": -7.822924526408315,
+      "source": "timestamp"
+    },
+    {
+      "filename": "20200815_115840.jpg",
+      "width": 4000,
+      "height": 3000,
+      "blur": "data:image/webp;base64,UklGRlIAAABXRUJQVlA4IEYAAADwAQCdASoQAAwAA4BaJZgCdH8ADNRrmAAA/iMP6Tw1AYYPyBmPmZ25x8oCl8pwtnujh9Ygk/swkblUtxXBTbmhuzj/CQAA",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 31.123755192384124,
+      "lng": -7.822924526408315,
+      "source": "timestamp"
+    },
+    {
+      "filename": "20200815_115849.jpg",
+      "width": 3648,
+      "height": 2736,
+      "blur": "data:image/webp;base64,UklGRnAAAABXRUJQVlA4IGQAAABQAgCdASoQAAwAA4BaJbACdAYtVnbJ7bCjRHgA/scrm7FV3SXG3DESR5uZRop1nCD1HAdSE/MhPi0bWWGPizdQrOz7h/pXX+GYmkXBCaMW0VUAqPfoK3oOh0NtqmaEXsqa6AAA",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 31.123755192384124,
+      "lng": -7.822924526408315,
+      "source": "timestamp"
+    },
+    {
+      "filename": "20200815_193349.jpg",
+      "width": 4000,
+      "height": 3000,
+      "blur": "data:image/webp;base64,UklGRlIAAABXRUJQVlA4IEYAAACwAQCdASoQAAwAA4BaJQBOgCBXiqAAAPZHI+FRI6kt0PSnMc5knWyxglRdyFOi+s1El2R3ZnNNQG8B5H/sYPDqKeW/BRAA",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": false,
+      "lat": null,
+      "lng": null,
+      "source": "unplaced"
+    },
+    {
+      "filename": "20200815_193352.jpg",
+      "width": 4000,
+      "height": 3000,
+      "blur": "data:image/webp;base64,UklGRlIAAABXRUJQVlA4IEYAAAAwAgCdASoQAAwAA4BaJYgCdAEejmW5DD4QAAD9wBGM7J03TmkBZdfXRNNBgXv8bonlzES2f1/sz6rdfVm6ydGORuHQAAAA",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": false,
+      "lat": null,
+      "lng": null,
+      "source": "unplaced"
+    }
+  ]
+}
