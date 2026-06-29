@@ -54,9 +54,11 @@ if (gpx?.stats.startEpochMs != null && gpx.stats.endEpochMs != null && gpx.stats
     startClock: formatClock(gpx.stats.startEpochMs, tz.id),
     endClock: formatClock(gpx.stats.endEpochMs, tz.id),
     movingSeconds: gpx.stats.movingSeconds,
-    elapsedSeconds: gpx.stats.durationSeconds!,
+    wallClockSeconds: gpx.stats.durationSeconds!,
     paceSecPerKm: gpx.stats.movingPaceSecPerKm,
     tzId: tz.id,
+    days: gpx.stats.days ?? 1,
+    nights: gpx.stats.nights,
   };
 }
 

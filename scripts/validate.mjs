@@ -76,10 +76,15 @@ async function validateHike(slug) {
     try {
       gpx = parseGpx(fs.readFileSync(trackPath, 'utf-8'));
       const hasTimes = gpx.times.some((t) => t != null);
-      notes.push(
+      const multiDay = gpx.stats.nights > 0;
+      const trackSummary =
         `track: ${gpx.stats.points} pts · ${gpx.stats.distance_km} km · ${gpx.stats.ascent_m} m↑` +
-          (hasTimes ? ` · ${gpx.stats.duration ?? '—'}` : ' · no timestamps'),
-      );
+        (hasTimes
+          ? multiDay
+            ? ` · ${gpx.stats.days} days · ${gpx.stats.nights} night(s) · ${gpx.stats.duration ?? '—'} moving`
+            : ` · ${gpx.stats.duration ?? '—'}`
+          : ' · no timestamps');
+      notes.push(trackSummary);
       if (!hasTimes) warnings.push('GPX has no per-point timestamps (timestamp photo matching disabled)');
 
       // --- timezone sanity ---

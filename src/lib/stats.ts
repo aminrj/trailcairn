@@ -21,9 +21,14 @@ export interface TimeStats {
   startClock: string; // local "HH:MM"
   endClock: string; // local "HH:MM"
   movingSeconds: number;
-  elapsedSeconds: number;
+  /** Wall-clock elapsed seconds (end − start, includes overnight stops). */
+  wallClockSeconds: number;
   paceSecPerKm: number | null;
   tzId: string; // resolved IANA zone (for the title/tooltip)
+  /** Calendar days spanned (1 = day hike, 2 = one night out, …). */
+  days: number;
+  /** Number of overnight stops detected (gaps > 4 h between trackpoints). */
+  nights: number;
 }
 
 export function aggregateLifetime(lines: HikeStatLine[]): LifetimeStats {

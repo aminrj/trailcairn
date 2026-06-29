@@ -66,6 +66,10 @@ copy. Keep it in as few hardcoded places as possible so a rename is a quick find
   marker per point. Precompute GPX→GeoJSON at build time; never ship raw GPX to the client.
 - **Stats:** derive distance/ascent/descent/duration from the GPX at build time; frontmatter
   values override. Smooth elevation lightly so GPS noise doesn't inflate ascent.
+  **Duration is always moving time** (segments below 0.5 km/h excluded). For multi-day hikes
+  the stats band shows "N days · N night(s) out" + moving time instead of a start–end clock
+  that would misleadingly span overnight pauses. `validate` surfaces nights and days in the
+  track summary line. Never use wall-clock elapsed time as the displayed duration.
 - **Photo placement:** EXIF GPS first; else match photo timestamp to nearest GPX trackpoint; else
   leave unplaced (never error). Honor `_photos.json` overrides. Watch the **timezone** issue
   (EXIF local vs GPX UTC) — a wrong offset shifts every photo; surface a warning in `validate`.

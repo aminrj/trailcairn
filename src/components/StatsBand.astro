@@ -3,6 +3,10 @@
 // resolved (derived-or-overridden); pass null for unknowns. Time stats are
 // optional and only present when the GPX has per-point timestamps — times are
 // shown in the hike's local timezone (resolved in [slug].astro).
+//
+// Multi-day hikes: `duration` is always MOVING time (overnight gaps excluded).
+// For multi-day hikes the stats band shows "N days · Xh Ym moving" instead of
+// a start–end clock that would span overnight pauses.
 import type { TimeStats } from '../lib/stats';
 
 interface Props {
@@ -29,12 +33,23 @@ const stats: { label: string; value: string; title?: string }[] = [
 ];
 
 if (timeStats) {
-  // Times available → show the day's window, moving vs elapsed, and pace.
-  stats.push(
-    { label: 'Start–End', value: `${timeStats.startClock}–${timeStats.endClock}`, title: timeStats.tzId },
-    { label: 'Moving', value: hm(timeStats.movingSeconds) },
-    { label: 'Elapsed', value: hm(timeStats.elapsedSeconds) },
-  );
+  const isMultiDay = timeStats.days > 1;
+  if (isMultiDay) {
+    // Multi-day: show span in days + nights, then moving time. Start–end clocks
+    // are misleading across overnight pauses so they're omitted here.
+    const nightLabel = timeStats.nights === 1 ? '1 night out' : `${timeStats.nights} nights out`;
+    stats.push(
+      { label: 'Trip', value: `${timeStats.days} days · ${nightLabel}` },
+      { label: 'Moving', value: hm(timeStats.movingSeconds) },
+    );
+  } else {
+    // Day hike: show start–end window, moving vs elapsed, pace.
+    stats.push(
+      { label: 'Start–End', value: `${timeStats.startClock}–${timeStats.endClock}`, title: timeStats.tzId },
+      { label: 'Moving', value: hm(timeStats.movingSeconds) },
+      { label: 'Elapsed', value: hm(timeStats.wallClockSeconds) },
+    );
+  }
   if (timeStats.paceSecPerKm != null) stats.push({ label: 'Pace', value: pace(timeStats.paceSecPerKm) });
 } else {
   // No per-point timestamps → fall back to whatever duration we have (or —).

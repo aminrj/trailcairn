@@ -9,14 +9,25 @@ export interface HikeStats {
   ascent_m: number;
   /** Total elevation loss, m, integer (lightly smoothed). */
   descent_m: number;
-  /** Human duration, e.g. "6h 20m". null when the GPX has no timestamps. */
+  /**
+   * Human moving time, e.g. "6h 20m". Excludes stopped segments (camp stops,
+   * overnight pauses, GPS-off gaps). null when the GPX has no timestamps.
+   * For multi-day hikes this is the meaningful figure; use `days` for the span.
+   */
   duration: string | null;
-  /** Elapsed (wall-clock) duration in seconds = end − start. null when no timestamps. */
+  /** Wall-clock elapsed seconds = end − start (includes nights). null when no timestamps. */
   durationSeconds: number | null;
   /** Moving time in seconds — excludes stopped segments (< MOVING_SPEED_KMH). null when no timestamps. */
   movingSeconds: number | null;
   /** Average moving pace, seconds per km (over moving distance). null when no timestamps. */
   movingPaceSecPerKm: number | null;
+  /**
+   * Calendar-day span of the hike: 1 for a day hike, 2 for an overnight, 3 for
+   * two nights out, etc. Derived from start/end UTC dates. null when no timestamps.
+   */
+  days: number | null;
+  /** Number of overnight stops (gaps > 4 h between consecutive trackpoints). */
+  nights: number;
   /** Number of trackpoints used. */
   points: number;
   /** ISO timestamps of first/last point, when present. */
@@ -250,6 +261,24 @@ export function parseGpx(xml: string): GpxData {
   const movingPaceSecPerKm =
     hasTimes && movingSeconds > 0 && movingDistanceM > 0 ? movingSeconds / (movingDistanceM / 1000) : null;
 
+  // Multi-day detection: count gaps > 4 h between consecutive trackpoints.
+  // A "night out" is any gap long enough to include sleep; 4 h is conservative
+  // (catches camp stops but not lunch breaks which are typically < 2 h).
+  const NIGHT_GAP_MS = 4 * 3600 * 1000;
+  let nights = 0;
+  for (let i = 1; i < timesMs.length; i++) {
+    const t0 = timesMs[i - 1];
+    const t1 = timesMs[i];
+    if (t0 != null && t1 != null && t1 - t0 >= NIGHT_GAP_MS) nights++;
+  }
+  // Calendar-day span: how many distinct UTC dates the hike touches.
+  let days: number | null = null;
+  if (startEpochMs != null && endEpochMs != null) {
+    const startDay = Math.floor(startEpochMs / 86400000);
+    const endDay = Math.floor(endEpochMs / 86400000);
+    days = endDay - startDay + 1;
+  }
+
   const line: Feature<LineString> = {
     type: 'Feature',
     properties: {},
@@ -271,10 +300,14 @@ export function parseGpx(xml: string): GpxData {
       distance_km: Math.round((distanceM / 1000) * 10) / 10,
       ascent_m: Math.round(ascent),
       descent_m: Math.round(descent),
-      duration: durationSeconds != null ? formatDuration(durationSeconds) : null,
+      // duration = moving time (excludes overnight pauses and long stops).
+      // For multi-day hikes this is the only meaningful single-figure summary.
+      duration: movingSeconds > 0 ? formatDuration(movingSeconds) : null,
       durationSeconds,
       movingSeconds: hasTimes ? Math.round(movingSeconds) : null,
       movingPaceSecPerKm: movingPaceSecPerKm != null ? Math.round(movingPaceSecPerKm) : null,
+      days,
+      nights,
       points: coords.length,
       startTime: firstTime,
       endTime: lastTime,
