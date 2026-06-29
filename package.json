@@ -10,6 +10,7 @@
     "preview": "astro preview",
     "photos": "tsx scripts/photos.mjs",
     "validate": "tsx scripts/validate.mjs",
+    "merge-gpx": "node scripts/merge-gpx.mjs",
     "astro": "astro"
   },
   "dependencies": {
