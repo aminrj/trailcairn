@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "photos": [
+    {
+      "filename": "IMG_0252.jpg",
+      "width": 4032,
+      "height": 3024,
+      "blur": "data:image/webp;base64,UklGRlQAAABXRUJQVlA4IEgAAAAQAgCdASoQAAwAA4BaJbACdAEDpRyb/4gAAOIy7tBBklVKKbC85edfZYcvB0XAfCxLKxRabyG63R/FPPlWD93iJo83XG4KQAA=",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 57.81851944444445,
+      "lng": 12.386613888888888,
+      "source": "exif-gps"
+    },
+    {
+      "filename": "IMG_0253.jpg",
+      "width": 4032,
+      "height": 3024,
+      "blur": "data:image/webp;base64,UklGRk4AAABXRUJQVlA4IEIAAADwAQCdASoQAAwAA4BaJbACdAD0Y6+oQAAA/qzVHQUV0QhRUnPFpGC7WpX6AFx8TjrQhVtpSLd/VbO30tPNvkSoAAA=",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 57.818511111111114,
+      "lng": 12.386624999999999,
+      "source": "exif-gps"
+    },
+    {
+      "filename": "IMG_0254.jpg",
+      "width": 4032,
+      "height": 3024,
+      "blur": "data:image/webp;base64,UklGRloAAABXRUJQVlA4IE4AAADwAQCdASoQAAwAA4BaJQBOgCIOJ/I5TAAA/s3+Wlg2kp++wTt9ZwvYbSFKpuLKI7c+SYODalM5u/yQJutCFr2cBaxdEiGtiRxXKhIAAAA=",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 57.81826388888889,
+      "lng": 12.388463888888888,
+      "source": "exif-gps"
+    },
+    {
+      "filename": "IMG_0255.jpg",
+      "width": 4032,
+      "height": 3024,
+      "blur": "data:image/webp;base64,UklGRlgAAABXRUJQVlA4IEwAAADQAQCdASoQAAwAA4BaJZACdAEOwO5T+AD+wHZg/6oLV9wKKgRmMwDgcwvj5tSZaIDTv0tGn4jrYxYNnHEh4xnb8ui937ePvAVCIAAA",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 57.81826388888889,
+      "lng": 12.388463888888888,
+      "source": "exif-gps"
+    },
+    {
+      "filename": "IMG_0264.jpg",
+      "width": 4032,
+      "height": 3024,
+      "blur": "data:image/webp;base64,UklGRlwAAABXRUJQVlA4IFAAAADwAQCdASoQAAwAA4BaJbACdACynYuEjQAA/tq/NHsJie3bgHjkPfMwUh0WZaIsdiyIkB2vdBmcFXce9VYff/hTnUjsbbe+a/vguQMwsYRgAA==",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 57.81374722222222,
+      "lng": 12.423108333333333,
+      "source": "exif-gps"
+    },
+    {
+      "filename": "IMG_0266.JPG",
+      "width": 3520,
+      "height": 1980,
+      "blur": "data:image/webp;base64,UklGRlYAAABXRUJQVlA4IEoAAAAQAgCdASoQAAkAA4BaJZACdAEDUwX/EQEAAPZX1Yk+qMRAyKFViiM9sBi1NEznFQ7wp1635IMwOD127EuuxAqFm8PKMzpqWUAAAA==",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 57.821133333333336,
+      "lng": 12.430652777777777,
+      "source": "exif-gps"
+    }
+  ]
+}

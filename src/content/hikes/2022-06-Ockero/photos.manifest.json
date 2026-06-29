@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "photos": [
+    {
+      "filename": "20220619_123247.jpg",
+      "width": 4032,
+      "height": 3024,
+      "blur": "data:image/webp;base64,UklGRmIAAABXRUJQVlA4IFYAAAAQAgCdASoQAAwAA4BaJbACdAEOfQXd2Z0AAP7u5t7NrwaZIGB+qiHaNyleUZQplvHVUrXg4IVOSCppitg9ybvhOPCpBlZmlviR/C1zmDXQTycsHIcAAA==",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 57.68058065325022,
+      "lng": 11.66572043672204,
+      "source": "timestamp"
+    },
+    {
+      "filename": "20220619_123251.jpg",
+      "width": 4032,
+      "height": 3024,
+      "blur": "data:image/webp;base64,UklGRnYAAABXRUJQVlA4IGoAAAAwAgCdASoQAAwAA4BaJagCdAYv/vRJyn2lMAD2rY8+6Ul0tbWCoBRCu+MwW2wdm/fzBwKxLDtQenZIk950PSYirWEx94yYNU++UozuGq+hnEePoIqTlw6d0O/rQvInnIYgJNGNA55GAAAA",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 57.68060035072267,
+      "lng": 11.665695710107684,
+      "source": "timestamp"
+    }
+  ]
+}

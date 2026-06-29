@@ -1,8 +1,8 @@
 ---
-title: "Götaleden"
+title: "Götaleden — Dag 1"
 date: 2022-07-09
 location: "Götaleden, Sweden"
-summary: "A multi-stage hike along the Götaleden trail."
+summary: "First leg of the Götaleden trail."
 track: "track.gpx"
 ---
 
