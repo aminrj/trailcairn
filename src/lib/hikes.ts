@@ -101,6 +101,8 @@ export async function getIndexMapData(): Promise<IndexMapData> {
       distance_km: hike.data.distance_km ?? gpx?.stats.distance_km ?? null,
       ascent_m: hike.data.ascent_m ?? gpx?.stats.ascent_m ?? null,
       date: hike.data.date,
+      days: gpx?.stats.days ?? 1,
+      nights: gpx?.stats.nights ?? 0,
     });
 
     if (!gpx) continue; // no track → not on the map

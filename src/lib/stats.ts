@@ -5,13 +5,20 @@ export interface HikeStatLine {
   distance_km: number | null;
   ascent_m: number | null;
   date: Date;
+  /** Calendar days spent on this hike (1 = day hike, 3 = two nights out). Derived from GPX. */
+  days: number;
+  /** Overnight stops on this hike (gaps > 4 h). Derived from GPX. */
+  nights: number;
 }
 
 export interface LifetimeStats {
   totalDistanceKm: number;
   totalAscentM: number;
   hikeCount: number;
-  distinctDays: number;
+  /** Total calendar days across all hikes (multi-day hikes count their full span). */
+  totalDays: number;
+  /** Total nights spent out across all hikes. */
+  totalNights: number;
   firstDate: Date | null;
   lastDate: Date | null;
 }
@@ -34,14 +41,16 @@ export interface TimeStats {
 export function aggregateLifetime(lines: HikeStatLine[]): LifetimeStats {
   let totalDistanceKm = 0;
   let totalAscentM = 0;
-  const days = new Set<string>();
+  let totalDays = 0;
+  let totalNights = 0;
   let firstDate: Date | null = null;
   let lastDate: Date | null = null;
 
   for (const l of lines) {
     if (l.distance_km != null) totalDistanceKm += l.distance_km;
     if (l.ascent_m != null) totalAscentM += l.ascent_m;
-    days.add(l.date.toISOString().slice(0, 10));
+    totalDays += l.days;
+    totalNights += l.nights;
     if (!firstDate || l.date < firstDate) firstDate = l.date;
     if (!lastDate || l.date > lastDate) lastDate = l.date;
   }
@@ -50,7 +59,8 @@ export function aggregateLifetime(lines: HikeStatLine[]): LifetimeStats {
     totalDistanceKm: Math.round(totalDistanceKm * 10) / 10,
     totalAscentM: Math.round(totalAscentM),
     hikeCount: lines.length,
-    distinctDays: days.size,
+    totalDays,
+    totalNights,
     firstDate,
     lastDate,
   };

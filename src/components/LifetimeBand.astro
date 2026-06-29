@@ -14,7 +14,8 @@ const range = first && last ? (first === last ? first : `${first} – ${last}`) 
 
 const cells: { label: string; value: string }[] = [
   { label: 'Hikes', value: String(stats.hikeCount) },
-  { label: 'Days out', value: String(stats.distinctDays) },
+  { label: 'Days out', value: String(stats.totalDays) },
+  { label: 'Nights out', value: String(stats.totalNights) },
   { label: 'Distance', value: `${stats.totalDistanceKm} km` },
   { label: 'Ascent', value: `${stats.totalAscentM} m` },
   { label: 'Span', value: range },
