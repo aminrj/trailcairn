@@ -232,18 +232,41 @@ export function parseGpx(xml: string): GpxData {
     }
   }
 
-  // Elevation: smoothed, then thresholded accumulation to reject noise.
+  // Elevation: smoothed, then hysteresis accumulation to reject noise while
+  // preserving genuine small-step gains on dense Garmin tracks.
+  //
+  // The old per-delta threshold (> 1m) silently discarded ALL elevation change
+  // on high-density tracks (e.g. Garmin recording every ~2m) because each step
+  // is only ~0.3m — far below the threshold — even though the real ascent is
+  // thousands of metres. The hysteresis approach accumulates consecutive gains
+  // and only commits them once they exceed the noise floor, then resets. This
+  // correctly handles both coarse (one point per 10s) and dense tracks.
   const rawEle = coords.map((c) => (typeof c[2] === 'number' ? c[2] : 0));
   const hasElevation = coords.some((c) => typeof c[2] === 'number');
   const elevations = hasElevation ? smooth(rawEle) : rawEle;
   let ascent = 0;
   let descent = 0;
-  const NOISE_THRESHOLD_M = 1; // ignore sub-metre wiggle after smoothing
+  const NOISE_THRESHOLD_M = 1; // minimum run of gain/loss before it counts
   if (hasElevation) {
+    let pendingGain = 0;
+    let pendingLoss = 0;
     for (let i = 1; i < elevations.length; i++) {
       const delta = elevations[i] - elevations[i - 1];
-      if (delta > NOISE_THRESHOLD_M) ascent += delta;
-      else if (delta < -NOISE_THRESHOLD_M) descent += -delta;
+      if (delta > 0) {
+        pendingLoss = 0;
+        pendingGain += delta;
+        if (pendingGain >= NOISE_THRESHOLD_M) {
+          ascent += pendingGain;
+          pendingGain = 0;
+        }
+      } else if (delta < 0) {
+        pendingGain = 0;
+        pendingLoss += -delta;
+        if (pendingLoss >= NOISE_THRESHOLD_M) {
+          descent += pendingLoss;
+          pendingLoss = 0;
+        }
+      }
     }
   }
 

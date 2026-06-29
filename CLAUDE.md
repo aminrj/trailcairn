@@ -70,6 +70,10 @@ copy. Keep it in as few hardcoded places as possible so a rename is a quick find
   the stats band shows "N days · N night(s) out" + moving time instead of a start–end clock
   that would misleadingly span overnight pauses. `validate` surfaces nights and days in the
   track summary line. Never use wall-clock elapsed time as the displayed duration.
+  **Elevation uses hysteresis accumulation** (not a per-delta threshold): consecutive gains
+  are accumulated and committed only once they exceed the noise floor. This correctly handles
+  both coarse tracks (one point per 10s) and dense Garmin tracks (one point per ~2m) where
+  per-step deltas are tiny but the real ascent is thousands of metres.
 - **Photo placement:** EXIF GPS first; else match photo timestamp to nearest GPX trackpoint; else
   leave unplaced (never error). Honor `_photos.json` overrides. Watch the **timezone** issue
   (EXIF local vs GPX UTC) — a wrong offset shifts every photo; surface a warning in `validate`.
