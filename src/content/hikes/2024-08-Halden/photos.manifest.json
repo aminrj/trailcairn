@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "photos": [
+    {
+      "filename": "IMG_5229~2.jpg",
+      "width": 4032,
+      "height": 3024,
+      "blur": "data:image/webp;base64,UklGRl4AAABXRUJQVlA4IFIAAADwAQCdASoQAAwAA4BaJYgCdAD1bsIyagAA/oPkCNZLUHqG+3Htv4OaL4RkkF4nxLgEyq1mwmHnLvfMZ20HFllwYDKzU13wVG2Q6BxzHAA4lAAA",
+      "caption": null,
+      "order": 9007199254740991,
+      "placed": true,
+      "lat": 59.051254000514746,
+      "lng": 11.367676137015224,
+      "source": "timestamp"
+    }
+  ]
+}
