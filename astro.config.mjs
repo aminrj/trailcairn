@@ -10,4 +10,9 @@ export default defineConfig({
   build: {
     format: 'directory',
   },
+  // Point the Astro content cache at /tmp so Cloudflare Pages never reuses a
+  // stale build cache from a previous deploy. Without this, adding a new hike
+  // folder updates the individual page but the index map stays stale because
+  // Cloudflare restores the cached .astro/data-store.json from the prior build.
+  cacheDir: '/tmp/astro-cache',
 });
