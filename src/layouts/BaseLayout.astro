@@ -51,7 +51,19 @@ const ogImageUrl = new URL(ogImage, Astro.site).href;
   <body>
     <header class="site-header">
       <div class="wrap">
-        <a class="brand" href="/">{SITE_NAME}</a>
+        <a class="brand" href="/">
+          <!-- Cairn icon: stacked stones, matches favicon -->
+          <svg class="brand-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+            <g fill="currentColor">
+              <ellipse cx="16" cy="24"   rx="7"   ry="2.6" />
+              <ellipse cx="16" cy="19.5" rx="5.4" ry="2.3" />
+              <ellipse cx="16" cy="15.5" rx="4.1" ry="2"   />
+              <ellipse cx="16" cy="12"   rx="3"   ry="1.7" />
+              <circle  cx="16" cy="8.8"  r="2.1"            />
+            </g>
+          </svg>
+          {SITE_NAME}
+        </a>
         <nav>
           <a href="/">Hikes</a>
           <a href="/about">About</a>
