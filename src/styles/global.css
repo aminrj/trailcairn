@@ -99,11 +99,12 @@ a {
   font-weight: 600;
   color: var(--accent);
   text-decoration: none;
+  text-transform: capitalize;
   line-height: 1;
 }
 .brand-icon {
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.9rem;
+  height: 1.9rem;
   flex-shrink: 0;
   color: var(--accent);
 }

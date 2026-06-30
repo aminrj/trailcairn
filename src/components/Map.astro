@@ -73,22 +73,6 @@ const config = {
 
 <div class="maplibre-map" id={id} data-map style={`--map-height:${height}`}>
   <script type="application/json" class="map-config" set:html={JSON.stringify(config)}></script>
-  <button class="map-fullscreen-btn" data-fullscreen aria-label="Enter fullscreen" title="Fullscreen">
-    <!-- expand icon -->
-    <svg class="icon-expand" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-      <polyline points="3,8 3,3 8,3"/>
-      <polyline points="12,3 17,3 17,8"/>
-      <polyline points="17,12 17,17 12,17"/>
-      <polyline points="8,17 3,17 3,12"/>
-    </svg>
-    <!-- collapse icon (shown in fullscreen) -->
-    <svg class="icon-collapse" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-      <polyline points="8,3 3,3 3,8"/>
-      <polyline points="17,8 17,3 12,3"/>
-      <polyline points="12,17 17,17 17,12"/>
-      <polyline points="3,12 3,17 8,17"/>
-    </svg>
-  </button>
   <noscript>
     <p class="map-fallback">An interactive map requires JavaScript.</p>
   </noscript>
@@ -115,12 +99,8 @@ const config = {
     border: none !important;
     max-height: none !important;
   }
-  /* Fullscreen button — top-right corner, above MapLibre controls */
+  /* Fullscreen button — rendered as a MapLibre control in the bottom-right slot */
   .map-fullscreen-btn {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    z-index: 10;
     width: 30px;
     height: 30px;
     padding: 5px;
@@ -144,10 +124,13 @@ const config = {
     height: 16px;
     display: block;
   }
-  /* Toggle icons based on fullscreen state */
-  .map-fullscreen-btn .icon-collapse { display: none; }
-  .maplibre-map.is-fullscreen .map-fullscreen-btn .icon-expand  { display: none; }
-  .maplibre-map.is-fullscreen .map-fullscreen-btn .icon-collapse { display: block; }
+  /* Toggle icons based on fullscreen state — handled in JS via style.display */
+  .map-fullscreen-btn .icon-expand,
+  .map-fullscreen-btn .icon-collapse {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
   .map-fallback {
     padding: 1rem;
     font-size: 0.9rem;
@@ -570,45 +553,61 @@ const config = {
     // Expose for the page (lightbox fly-to, replay player).
     (el as any).__map = map;
 
-    // Fullscreen button — Fullscreen API with vendor prefix fallbacks.
-    const fsBtn = el.querySelector<HTMLButtonElement>('[data-fullscreen]');
-    if (fsBtn) {
-      const requestFS = () => {
-        const fn =
-          el.requestFullscreen?.bind(el) ??
-          (el as any).webkitRequestFullscreen?.bind(el) ??
-          (el as any).mozRequestFullScreen?.bind(el);
-        fn?.();
-      };
-      const exitFS = () => {
-        const fn =
-          document.exitFullscreen?.bind(document) ??
-          (document as any).webkitExitFullscreen?.bind(document) ??
-          (document as any).mozCancelFullScreen?.bind(document);
-        fn?.();
-      };
-      fsBtn.addEventListener('click', () => {
-        const isFs =
-          document.fullscreenElement === el ||
-          (document as any).webkitFullscreenElement === el ||
-          (document as any).mozFullScreenElement === el;
-        isFs ? exitFS() : requestFS();
-      });
-      // Sync the is-fullscreen class (and icon toggle) on both enter and exit.
-      const onFsChange = () => {
-        const active =
-          document.fullscreenElement === el ||
-          (document as any).webkitFullscreenElement === el ||
-          (document as any).mozFullScreenElement === el;
-        el.classList.toggle('is-fullscreen', active);
-        fsBtn.setAttribute('aria-label', active ? 'Exit fullscreen' : 'Enter fullscreen');
-        // Resize MapLibre so it fills the new dimensions correctly.
-        map.resize();
-      };
-      document.addEventListener('fullscreenchange', onFsChange);
-      document.addEventListener('webkitfullscreenchange', onFsChange);
-      document.addEventListener('mozfullscreenchange', onFsChange);
+    // Fullscreen control — implemented as a proper MapLibre IControl so it
+    // slots into the bottom-right control stack without overlapping zoom buttons.
+    class FullscreenControl {
+      _btn!: HTMLButtonElement;
+      _container!: HTMLDivElement;
+      onAdd() {
+        const EXPAND = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,8 3,3 8,3"/><polyline points="12,3 17,3 17,8"/><polyline points="17,12 17,17 12,17"/><polyline points="8,17 3,17 3,12"/></svg>`;
+        const COLLAPSE = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,3 3,3 3,8"/><polyline points="17,8 17,3 12,3"/><polyline points="12,17 17,17 17,12"/><polyline points="3,12 3,17 8,17"/></svg>`;
+        const btn = document.createElement('button');
+        btn.className = 'map-fullscreen-btn';
+        btn.setAttribute('aria-label', 'Enter fullscreen');
+        btn.title = 'Fullscreen';
+        btn.innerHTML = `<span class="icon-expand">${EXPAND}</span><span class="icon-collapse" style="display:none">${COLLAPSE}</span>`;
+        btn.addEventListener('click', () => {
+          const isFs =
+            document.fullscreenElement === el ||
+            (document as any).webkitFullscreenElement === el ||
+            (document as any).mozFullScreenElement === el;
+          if (isFs) {
+            const fn = document.exitFullscreen?.bind(document) ??
+              (document as any).webkitExitFullscreen?.bind(document) ??
+              (document as any).mozCancelFullScreen?.bind(document);
+            fn?.();
+          } else {
+            const fn = el.requestFullscreen?.bind(el) ??
+              (el as any).webkitRequestFullscreen?.bind(el) ??
+              (el as any).mozRequestFullScreen?.bind(el);
+            fn?.();
+          }
+        });
+        const onFsChange = () => {
+          const active =
+            document.fullscreenElement === el ||
+            (document as any).webkitFullscreenElement === el ||
+            (document as any).mozFullScreenElement === el;
+          el.classList.toggle('is-fullscreen', active);
+          btn.setAttribute('aria-label', active ? 'Exit fullscreen' : 'Enter fullscreen');
+          btn.title = active ? 'Exit fullscreen' : 'Fullscreen';
+          (btn.querySelector('.icon-expand') as HTMLElement).style.display = active ? 'none' : '';
+          (btn.querySelector('.icon-collapse') as HTMLElement).style.display = active ? '' : 'none';
+          map.resize();
+        };
+        document.addEventListener('fullscreenchange', onFsChange);
+        document.addEventListener('webkitfullscreenchange', onFsChange);
+        document.addEventListener('mozfullscreenchange', onFsChange);
+        const c = document.createElement('div');
+        c.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+        c.appendChild(btn);
+        this._btn = btn;
+        this._container = c;
+        return c;
+      }
+      onRemove() { this._container.remove(); }
     }
+    map.addControl(new FullscreenControl(), 'bottom-right');
 
     // Live filter hook (index search): show only the given hike slugs, or all
     // when passed null. Filters both the pins and the faint track lines; the

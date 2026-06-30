@@ -29,8 +29,9 @@ copy. Keep it in as few hardcoded places as possible so a rename is a quick find
 ## How we work together (workflow)
 
 - **Branching:** Work on `dev` by default; `main` is production and auto-deploys (Cloudflare
-  Pages). Only the user merges `dev` → `main`. Never commit or push to `main` yourself unless
-  explicitly told to.
+  Pages). **Never commit, push, or merge to `main` yourself under any circumstances** — not
+  even for "trivial" fixes, not even when asked to "push everything". Always push to `dev`,
+  then explicitly stop and ask the user to review and merge. The user merges `dev` → `main`.
 - **Build in vertical slices, in the order given in SPEC.md §14.** Do not attempt the whole app
   in one go. One slice at a time:
   1. Scaffold + content collection + Zod schema
