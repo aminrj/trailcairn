@@ -142,19 +142,28 @@ hike, draft or published. Then `npm run validate` to confirm 0 errors and no sta
 > every hike folder directly, so the manifest is always ready before you publish. (`npm run build`
 > still refreshes published hikes' manifests as a side effect; `npm run photos` is the reliable one.)
 
-### 3. Upload that hike's **derivatives** to R2
-`copy` (adds/updates only, never deletes — safe), only the `.webp`, into a prefix that **exactly
-equals the slug** (the `public/_gen/photos/` subfolder name the build just created):
+### 3. Upload the **derivatives** to R2
 ```bash
-rclone copy -v public/_gen/photos/2026-07-skuleskogen r2:trailcairn-photos/2026-07-skuleskogen --include "*.webp"
+npm run publish
 ```
-- `-v` shows what uploaded; re-running is idempotent (skips files already in R2).
-- **The prefix MUST equal the build's `public/_gen/photos/<slug>` folder name.** Slugs are
-  lowercase ASCII (see DEPLOY.md), so folder = slug = R2 prefix line up. If a hike folder has
-  mixed case (e.g. `2026-06-Dals-Ed`), the generated slug is lowercased (`2026-06-dals-ed`) —
-  upload from the `public/_gen/photos/` name, not the source folder name.
-- One-shot for everything (all hikes at once, casing-proof):
-  `rclone copy -v public/_gen/photos r2:trailcairn-photos --include "*.webp"`.
+This is the casing-proof upload — **use it instead of a hand-typed `rclone copy`.** For each real
+hike it derives the lowercase slug the same way the build does, `rclone copy`s that hike's `.webp`
+to the matching R2 prefix, and then **verifies the object count landed** (so a mismatch can't pass
+silently). It's `copy` under the hood: adds/updates only, never deletes, idempotent on re-run.
+- `npm run publish -- --dry` — show local-vs-R2 counts per hike, upload nothing.
+- `npm run publish kulleberg` — only hikes whose slug contains the argument.
+- After uploading it prints any **stray mixed-case prefixes** (e.g. a `2026-07-Kulleberg/` left by
+  an old hand-upload beside the correct `2026-07-kulleberg/`) with the exact `rclone purge` to
+  remove the duplicate.
+
+> **Why a script and not `rclone copy` directly?** The contract is "R2 key = lowercase slug", but
+> hike folders are frequently mixed-case (`2026-07-Kulleberg`). Typing the destination by hand,
+> it's easy to upload to `…/2026-07-Kulleberg/` — which then 404s every image because the build
+> emits `…/2026-07-kulleberg/…`. `npm run publish` never lets a human type the prefix, so that
+> class of bug is gone. (The raw equivalent, if rclone-only: `rclone copy -v public/_gen/photos
+> r2:trailcairn-photos --include "*.webp"` — upload the whole tree, whose subfolders are already
+> lowercase slugs. Do **not** `rclone copy public/_gen/photos/<SourceFolderName>` with the
+> mixed-case folder name.)
 
 ### 4. Publish the text + manifest (git), then go live
 Commit only the text — index.md, the GPX, and the manifest. **Not** the photos.
@@ -171,8 +180,8 @@ git checkout main && git merge dev && git push      # → hikes.aminrj.com updat
 git checkout dev
 ```
 
-**Loop in one line:** `npm run photos` → `rclone copy` the derivatives → `git add -f` the text +
-manifest → push to `main`. (If the live site doesn't update, see "Deploy troubleshooting" in
+**Loop in one line:** `npm run photos` → `npm run publish` (uploads + verifies) → `git add -f` the
+text + manifest → push to `main`. (If the live site doesn't update, see "Deploy troubleshooting" in
 `DEPLOY.md` — usually it's an old cached page on the custom domain or a Retry rebuilding an old commit.)
 
 ### Worked example (one real photo, end to end)

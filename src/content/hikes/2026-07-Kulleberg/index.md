@@ -1,5 +1,5 @@
 ---
-title: "Kullegarg naturreservat"
+title: "Kulleberg naturreservat"
 date: 2026-07-18  
 location: "Kulleberg naturreservat, Sweden"
 summary: "One day hike thought the forest by the see."

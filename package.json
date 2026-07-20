@@ -9,6 +9,7 @@
     "build": "astro build && pagefind --site dist",
     "preview": "astro preview",
     "photos": "tsx scripts/photos.mjs",
+    "publish": "node scripts/publish-photos.mjs",
     "validate": "tsx scripts/validate.mjs",
     "merge-gpx": "node scripts/merge-gpx.mjs",
     "astro": "astro"

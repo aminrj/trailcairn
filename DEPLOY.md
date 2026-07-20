@@ -175,14 +175,16 @@ Photos live in **Cloudflare R2**, not git (see `R2-PHOTOS.md`). The publish ritu
 **generate → upload pixels → commit text → go live**:
 
 ```bash
-SLUG=2026-07-skuleskogen        # your hike's folder name (lowercase = the URL slug = the R2 prefix)
+SLUG=2026-07-skuleskogen        # your hike's folder name, LOWERCASED (= URL slug = R2 prefix)
 
 # 1. Generate the WebP derivatives + photos.manifest.json for every hike (draft or not).
 npm run photos
 npm run validate                # confirm 0 errors and no "manifest is stale" warning
 
-# 2. Upload THIS hike's derivatives (the .webp the build wrote) to R2.
-rclone copy -v public/_gen/photos/$SLUG r2:trailcairn-photos/$SLUG --include "*.webp"
+# 2. Upload derivatives to R2. `npm run publish` derives the lowercase slug itself
+#    and verifies each hike landed — so a slug/case typo can't silently 404 images.
+npm run publish                 # all hikes (idempotent — skips what's already in R2)
+#   npm run publish skuleskogen # …or just the ones whose slug matches an argument
 
 # 3. Commit ONLY the text (Markdown + GPX + manifest). NOT the photos.
 git add -f src/content/hikes/$SLUG/index.md \
@@ -193,6 +195,15 @@ git commit -m "Add Skuleskogen ridge hike"
 # 4. Go live.
 git push                        # to main → Cloudflare auto-deploys (~2 min)
 ```
+
+> **Why `npm run publish` and not a hand-typed `rclone copy`?** The one recurring way to break
+> images was typing the R2 destination with the wrong case: hike folders are often mixed-case
+> (`2026-07-Kulleberg`), but the served URL and R2 key are the *lowercase* slug
+> (`2026-07-kulleberg`). Uploading to `…/2026-07-Kulleberg/` then 404s every image. `npm run
+> publish` computes the lowercase slug the same way the build does, uploads there, verifies the
+> object count, and flags any leftover mixed-case prefixes to clean up. (The raw equivalent, if
+> you ever need it: `rclone copy -v public/_gen/photos r2:trailcairn-photos --include "*.webp"` —
+> upload the whole `_gen/photos` tree, whose subfolders are *already* lowercase slugs.)
 
 > Working on a `dev` branch instead? Same first three steps, then `git push` (preview build), and
 > when happy `git checkout main && git merge dev && git push && git checkout dev`. Either way, the
@@ -280,9 +291,12 @@ Photos come from R2 via the committed manifest. So:
   `npm run photos` (regenerates it for every hike, draft or not), then re-commit it. `npm run validate`
   warns when a manifest is stale.
 - **Individual images 404** → the derivative isn't in R2 at the matching key. You uploaded originals
-  instead of `public/_gen` derivatives, missed the `rclone copy` for that hike, or a slug/case
-  mismatch. Compare the `<img>` URL with `rclone lsf r2:trailcairn-photos/<slug>/` and re-upload.
-  Full contract + worked example in `R2-PHOTOS.md`.
+  instead of `public/_gen` derivatives, missed the upload for that hike, or a slug/case mismatch
+  (a mixed-case hike folder like `2026-07-Kulleberg` uploaded verbatim, when the URL wants the
+  lowercase `2026-07-kulleberg`). **Fix:** just run `npm run publish` — it uploads every hike to the
+  correct lowercase prefix, verifies the count, and prints any stray mixed-case prefixes to delete
+  (`rclone purge …`). Run `npm run publish -- --dry` first to see local-vs-R2 counts per hike without
+  uploading. Full contract + worked example in `R2-PHOTOS.md`.
 
 ### 6. Build fails on Cloudflare
 Check the build log. Usually a Node bump — set `NODE_VERSION` in the Pages env vars to current LTS,
