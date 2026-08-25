@@ -38,16 +38,16 @@
       "source": "exif-gps"
     },
     {
-      "filename": "IMG_1672.HEIC",
-      "width": 5712,
-      "height": 4284,
-      "blur": "data:image/webp;base64,UklGRlgAAABXRUJQVlA4IEwAAADQAQCdASoQAAwAA4BaJZQCdACzkPYkAAD+Wz4UrfrRYXHu73+1esZFoqlLl81qyGHD/Nv4DhRp7HbcLfsT+68gNn2ASnp7kkJQHWAA",
+      "filename": "IMG_1672.jpg",
+      "width": 4192,
+      "height": 3144,
+      "blur": "data:image/webp;base64,UklGRmQAAABXRUJQVlA4IFgAAACwAQCdASoQAAwAA4BaJQBWACEh4xBgAP6RTQEhBDbo9pmBK0xa9VNwmqnVJ16cO1N5URXeh2uHa1jGbDYylVY8T2wBRz9/SHhsEo1vyuvn+FgBx1pOAAAA",
       "caption": null,
       "order": 9007199254740991,
       "placed": true,
-      "lat": 40.071725,
-      "lng": -77.20433055555556,
-      "source": "exif-gps"
+      "lat": 40.07218080572784,
+      "lng": -77.2042209841311,
+      "source": "timestamp"
     },
     {
       "filename": "IMG_1676.HEIC",

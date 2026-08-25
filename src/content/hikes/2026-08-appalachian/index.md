@@ -11,8 +11,8 @@ summary: "Two days on the Appalachian Trail"
 track: "track.gpx"                        # GPX filename in this folder
 
 # --- optional ---
-# cover: "photos/IMG_0001.jpg"            # else the first photo is used
-# tags: ["wild camp", "2-day"]
+cover: "photos/IMG_1672.jpg"            # else the first photo is used
+tags: ["wild forest", "2-day"]
 status: "published"                       # draft | published (default: published)
 
 # Stats are DERIVED from the GPX at build time. Only set these to OVERRIDE a
@@ -28,4 +28,3 @@ status: "published"                       # draft | published (default: publishe
 Spent two days in the American wilderness hiking sections of the mythical
 Appalachian trail.
 The night spent in the historic mention "Ironmaster" with the company of some hikers.
-
